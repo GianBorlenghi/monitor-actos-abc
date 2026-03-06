@@ -1,4 +1,2 @@
-playwright
-twilio
 requests
-beautifulsoup4
+twilio
