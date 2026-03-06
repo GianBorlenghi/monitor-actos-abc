@@ -2,11 +2,8 @@ import os
 from playwright.sync_api import sync_playwright
 from twilio.rest import Client
 
-# distritos a buscar
 DISTRITOS = ["PERGAMINO", "SALTO", "ROJAS"]
-
-# archivo donde se guardan cargos ya avisados
-ARCHIVO_CARGOS = "cargos_encontrados.txt"
+ARCHIVO_CARGOS = "cargos_guardados.txt"
 
 
 def enviar_whatsapp(mensaje):
@@ -25,7 +22,7 @@ def enviar_whatsapp(mensaje):
     )
 
 
-def cargar_cargos_guardados():
+def cargar_historial():
 
     if not os.path.exists(ARCHIVO_CARGOS):
         return set()
@@ -34,7 +31,7 @@ def cargar_cargos_guardados():
         return set(f.read().splitlines())
 
 
-def guardar_cargo(cargo):
+def guardar_historial(cargo):
 
     with open(ARCHIVO_CARGOS, "a") as f:
         f.write(cargo + "\n")
@@ -45,14 +42,14 @@ def revisar():
     usuario = os.getenv("ABC_USER")
     password = os.getenv("ABC_PASS")
 
-    cargos_guardados = cargar_cargos_guardados()
+    historial = cargar_historial()
 
     with sync_playwright() as p:
 
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        # LOGIN ABC
+        # LOGIN
         page.goto("https://login.abc.gob.ar/nidp/idff/sso?id=ABC-Form&sid=0&option=credential&sid=0&target=https://menu.abc.gob.ar/")
 
         page.fill('input[name="username"]', usuario)
@@ -65,26 +62,58 @@ def revisar():
         # ACTOS PUBLICOS
         page.goto("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
 
-        page.wait_for_timeout(6000)
+        page.wait_for_timeout(8000)
 
-        contenido = page.content().upper()
+        # FILTRAR ESTADO PUBLICADA
+        page.click("text=Estado")
+        page.click("text=PUBLICADA")
+        page.click("text=FILTRAR")
+
+        page.wait_for_timeout(5000)
+
+        filas = page.query_selector_all("table tbody tr")
 
         nuevos_cargos = []
 
-        for distrito in DISTRITOS:
+        for fila in filas:
 
-            if distrito in contenido:
+            columnas = fila.query_selector_all("td")
 
-                if distrito not in cargos_guardados:
-                    nuevos_cargos.append(distrito)
-                    guardar_cargo(distrito)
+            if len(columnas) < 5:
+                continue
+
+            distrito = columnas[0].inner_text().strip().upper()
+            escuela = columnas[1].inner_text().strip()
+            cargo = columnas[2].inner_text().strip()
+            cierre = columnas[4].inner_text().strip()
+
+            if distrito in DISTRITOS:
+
+                identificador = f"{distrito}-{escuela}-{cargo}-{cierre}"
+
+                if identificador not in historial:
+
+                    nuevos_cargos.append({
+                        "distrito": distrito,
+                        "escuela": escuela,
+                        "cargo": cargo,
+                        "cierre": cierre
+                    })
+
+                    guardar_historial(identificador)
 
         if nuevos_cargos:
 
-            mensaje = "Actos públicos encontrados:\n"
+            mensaje = "📢 NUEVOS ACTOS PUBLICOS\n\n"
 
             for c in nuevos_cargos:
-                mensaje += f"- {c}\n"
+
+                mensaje += (
+                    f"🏫 Escuela: {c['escuela']}\n"
+                    f"📍 Distrito: {c['distrito']}\n"
+                    f"📚 Cargo: {c['cargo']}\n"
+                    f"⏰ Cierre: {c['cierre']}\n\n"
+                )
 
             enviar_whatsapp(mensaje)
 
