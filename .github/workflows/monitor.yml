@@ -1,30 +1,34 @@
-name: Monitor APD
+name: ABC alertas
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/15 * * * *"
 
 jobs:
   run-script:
+
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: checkout
+      uses: actions/checkout@v3
 
-      - name: Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+    - name: instalar python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.10
 
-      - name: Instalar dependencias
-        run: pip install -r requirements.txt
+    - name: instalar librerias
+      run: pip install -r requirements.txt
 
-      - name: Ejecutar bot
-        run: python main.py
-        env:
-          TWILIO_SID: ${{ secrets.TWILIO_SID }}
-          TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
-          TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
-          TWILIO_TO: ${{ secrets.TWILIO_TO }}
+    - name: ejecutar script
+      run: python script.py
+      env:
+        ABC_USER: ${{ secrets.ABC_USER }}
+        ABC_PASS: ${{ secrets.ABC_PASS }}
+
+        TWILIO_SID: ${{ secrets.TWILIO_SID }}
+        TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
+        TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
+        TWILIO_TO: ${{ secrets.TWILIO_TO }}
