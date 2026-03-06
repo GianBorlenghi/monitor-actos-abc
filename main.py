@@ -107,103 +107,21 @@ def revisar():
 # --- Ejecutar ---
 if __name__ == "__main__":
     revisar()'''
-import time
-import json
-import os
-
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-from twilio.rest import Client
-
-
-DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
-
-HISTORIAL_FILE = "historial.json"
-
-
-def cargar_historial():
-
-    if not os.path.exists(HISTORIAL_FILE):
-        return []
-
-    with open(HISTORIAL_FILE) as f:
-        return json.load(f)
-
-
-def guardar_historial(data):
-
-    with open(HISTORIAL_FILE, "w") as f:
-        json.dump(data, f)
-
-
-def enviar_whatsapp(msg):
-
-    sid = os.environ.get("TWILIO_SID")
-    token = os.environ.get("TWILIO_AUTH")
-    from_whatsapp = os.environ.get("TWILIO_FROM")
-    to_whatsapp = os.environ.get("TWILIO_TO")
-
-    client = Client(sid, token)
-
-    client.messages.create(
-        body=msg,
-        from_=from_whatsapp,
-        to=to_whatsapp
-    )
-
-
-def iniciar_driver():
-
-    options = Options()
-
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-
-    driver = webdriver.Chrome(options=options)
-
-    return driver
-
-
-def login(driver):
-
-    print("Abriendo portal...")
-
-    driver.get("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
+def aplicar_estado(driver):
 
     wait = WebDriverWait(driver, 30)
 
-    usuario = wait.until(
-        EC.presence_of_element_located((By.NAME, "Ecom_User_ID"))
-    )
-
-    password = driver.find_element(By.NAME, "Ecom_Password")
-
-    usuario.send_keys(os.environ.get("ABC_USER"))
-    password.send_keys(os.environ.get("ABC_PASS"))
-
-    password.send_keys(Keys.ENTER)
-
-    time.sleep(8)
-
-
-def aplicar_estado(driver):
-
-    wait = WebDriverWait(driver, 20)
-
     print("Abriendo filtro estado")
 
-    botones = driver.find_elements(By.CSS_SELECTOR, "button.btnFiltro")
+    boton = wait.until(
+        EC.element_to_be_clickable(
+            (By.CSS_SELECTOR, 'button[data-target=".autocomplete-estado-modal"]')
+        )
+    )
 
-    boton_estado = botones[1]
+    driver.execute_script("arguments[0].click();", boton)
 
-    driver.execute_script("arguments[0].click();", boton_estado)
+    print("Esperando modal estado")
 
     estado = wait.until(
         EC.visibility_of_element_located((By.ID, "autocompleteEstadoQuery"))
@@ -215,127 +133,4 @@ def aplicar_estado(driver):
 
     estado.send_keys(Keys.ENTER)
 
-    time.sleep(3)
-
-
-def aplicar_distrito(driver, distrito):
-
-    wait = WebDriverWait(driver, 20)
-
-    print("Buscando distrito:", distrito)
-
-    botones = driver.find_elements(By.CSS_SELECTOR, "button.btnFiltro")
-
-    boton_distrito = botones[0]
-
-    driver.execute_script("arguments[0].click();", boton_distrito)
-
-    dist = wait.until(
-        EC.visibility_of_element_located((By.ID, "autocompleteDistritoQuery"))
-    )
-
-    dist.clear()
-    dist.send_keys(distrito)
-
-    time.sleep(2)
-
-    dist.send_keys(Keys.ENTER)
-
-    time.sleep(5)
-
-
-def leer_tabla(driver):
-
-    filas = driver.find_elements(By.CSS_SELECTOR, "tbody tr")
-
-    datos = []
-
-    for f in filas:
-
-        c = f.find_elements(By.TAG_NAME, "td")
-
-        if len(c) < 6:
-            continue
-
-        establecimiento = c[1].text
-        distrito = c[2].text.upper()
-        cargo = c[3].text
-        fecha = c[5].text
-
-        datos.append({
-            "establecimiento": establecimiento,
-            "distrito": distrito,
-            "cargo": cargo,
-            "fecha": fecha
-        })
-
-    return datos
-
-
-def buscar_actos():
-
-    driver = iniciar_driver()
-
-    login(driver)
-
-    print("Entrando a actos públicos")
-
-    driver.get(
-        "https://misservicios.abc.gob.ar/actos.publicos.digitales/#/actosPublicos"
-    )
-
-    time.sleep(12)
-
-    aplicar_estado(driver)
-
-    historial = cargar_historial()
-
-    encontrados = []
-    nuevos = []
-
-    for d in DISTRITOS:
-
-        aplicar_distrito(driver, d)
-
-        resultados = leer_tabla(driver)
-
-        print("Filas encontradas:", len(resultados))
-
-        for r in resultados:
-
-            identificador = r["establecimiento"] + r["cargo"] + r["fecha"]
-
-            encontrados.append(identificador)
-
-            if identificador not in historial:
-
-                nuevos.append(r)
-
-    if nuevos:
-
-        msg = "📢 ACTOS PUBLICOS NUEVOS\n\n"
-
-        for n in nuevos:
-
-            msg += (
-                f"🏫 {n['establecimiento']}\n"
-                f"📍 {n['distrito']}\n"
-                f"📚 {n['cargo']}\n"
-                f"⏰ {n['fecha']}\n\n"
-            )
-
-        enviar_whatsapp(msg)
-
-        print("WhatsApp enviado")
-
-    else:
-
-        print("Sin novedades")
-
-    guardar_historial(encontrados)
-
-    driver.quit()
-
-
-if __name__ == "__main__":
-    buscar_actos()
+    time.sleep(4)
