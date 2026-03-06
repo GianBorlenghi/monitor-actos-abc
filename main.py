@@ -108,66 +108,161 @@ def revisar():
 if __name__ == "__main__":
     revisar()'''
 
+import json
+import os
+import time
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-import time
-import os
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 from twilio.rest import Client
 
-USUARIO = os.environ["ABC_USER"]
-PASSWORD = os.environ["ABC_PASS"]
 
-TWILIO_SID = os.environ["TWILIO_SID"]
-TWILIO_AUTH = os.environ["TWILIO_AUTH"]
-TWILIO_FROM = os.environ["TWILIO_FROM"]
-TWILIO_TO = os.environ["TWILIO_TO"]
+# -------------------------
+# CONFIGURACION
+# -------------------------
+
+DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
+HISTORIAL_FILE = "historial.json"
+
+ABC_USER = os.environ.get("ABC_USER")
+ABC_PASS = os.environ.get("ABC_PASS")
+
+TWILIO_SID = os.environ.get("TWILIO_SID")
+TWILIO_AUTH = os.environ.get("TWILIO_AUTH")
+TWILIO_FROM = os.environ.get("TWILIO_FROM")
+TWILIO_TO = os.environ.get("TWILIO_TO")
+
+
+# -------------------------
+# HISTORIAL
+# -------------------------
+
+def cargar_historial():
+
+    if not os.path.exists(HISTORIAL_FILE):
+        return []
+
+    with open(HISTORIAL_FILE) as f:
+        return json.load(f)
+
+
+def guardar_historial(data):
+
+    with open(HISTORIAL_FILE, "w") as f:
+        json.dump(data, f)
+
+
+# -------------------------
+# WHATSAPP
+# -------------------------
 
 def enviar_whatsapp(msg):
+
     client = Client(TWILIO_SID, TWILIO_AUTH)
+
     client.messages.create(
         body=msg,
         from_=TWILIO_FROM,
         to=TWILIO_TO
     )
 
+
+# -------------------------
+# BOT
+# -------------------------
+
 def buscar_actos():
+
+    historial = cargar_historial()
+    nuevos = []
+    encontrados = []
 
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
 
     driver = webdriver.Chrome(options=chrome_options)
 
-    try:
+    wait = WebDriverWait(driver, 20)
 
-        driver.get("https://misservicios.abc.gob.ar")
+    print("Abriendo portal...")
 
-        time.sleep(3)
+    driver.get("https://misservicios.abc.gob.ar")
 
-        driver.find_element(By.NAME, "Ecom_User_ID").send_keys(USUARIO)
-        driver.find_element(By.NAME, "Ecom_Password").send_keys(PASSWORD)
+    # usuario
+    usuario = wait.until(
+        EC.presence_of_element_located((By.NAME, "Ecom_User_ID"))
+    )
+    usuario.send_keys(ABC_USER)
 
-        driver.find_element(By.NAME, "login").click()
+    # contraseña
+    password = driver.find_element(By.NAME, "Ecom_Password")
+    password.send_keys(ABC_PASS)
 
-        time.sleep(5)
+    # botón login
+    boton = wait.until(
+        EC.element_to_be_clickable((By.ID, "loginButton2"))
+    )
+    boton.click()
 
-        driver.get("https://misservicios.abc.gob.ar/actos.publicos.digitales")
+    print("Login realizado")
 
-        time.sleep(5)
+    time.sleep(5)
 
-        html = driver.page_source
+    driver.get(
+        "https://misservicios.abc.gob.ar/actos.publicos.digitales/#/busqueda"
+    )
 
-        if "cargo" in html.lower():
-            enviar_whatsapp("⚠️ Hay nuevos actos públicos publicados")
+    time.sleep(5)
 
-            print("mensaje enviado")
-        else:
-            print("sin novedades")
+    cards = driver.find_elements(By.CLASS_NAME, "card")
 
-    finally:
-        driver.quit()
+    for c in cards:
 
+        texto = c.text
+
+        for d in DISTRITOS:
+
+            if d in texto:
+
+                identificador = texto[:50]
+
+                encontrados.append(identificador)
+
+                if identificador not in historial:
+
+                    nuevos.append(texto)
+
+    driver.quit()
+
+    if nuevos:
+
+        msg = "📢 ACTOS PUBLICOS NUEVOS\n\n"
+
+        for n in nuevos:
+
+            msg += n + "\n\n"
+
+        enviar_whatsapp(msg)
+
+        print("WhatsApp enviado")
+
+    else:
+
+        print("Sin novedades")
+
+    guardar_historial(encontrados)
+
+
+# -------------------------
+# MAIN
+# -------------------------
 
 if __name__ == "__main__":
+
     buscar_actos()
