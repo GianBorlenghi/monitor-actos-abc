@@ -108,145 +108,143 @@ def revisar():
 if __name__ == "__main__":
     revisar()'''
 
+import time
 import json
 import os
-import time
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 from twilio.rest import Client
 
 
-# -------------------------
-# CONFIGURACION
-# -------------------------
-
 DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
 HISTORIAL_FILE = "historial.json"
 
-ABC_USER = os.environ.get("ABC_USER")
-ABC_PASS = os.environ.get("ABC_PASS")
-
-TWILIO_SID = os.environ.get("TWILIO_SID")
-TWILIO_AUTH = os.environ.get("TWILIO_AUTH")
-TWILIO_FROM = os.environ.get("TWILIO_FROM")
-TWILIO_TO = os.environ.get("TWILIO_TO")
-
-
-# -------------------------
-# HISTORIAL
-# -------------------------
 
 def cargar_historial():
-
     if not os.path.exists(HISTORIAL_FILE):
         return []
-
     with open(HISTORIAL_FILE) as f:
         return json.load(f)
 
 
 def guardar_historial(data):
-
     with open(HISTORIAL_FILE, "w") as f:
         json.dump(data, f)
 
 
-# -------------------------
-# WHATSAPP
-# -------------------------
-
 def enviar_whatsapp(msg):
 
-    client = Client(TWILIO_SID, TWILIO_AUTH)
+    sid = os.environ.get("TWILIO_SID")
+    token = os.environ.get("TWILIO_AUTH")
+    from_whatsapp = os.environ.get("TWILIO_FROM")
+    to_whatsapp = os.environ.get("TWILIO_TO")
+
+    client = Client(sid, token)
 
     client.messages.create(
         body=msg,
-        from_=TWILIO_FROM,
-        to=TWILIO_TO
+        from_=from_whatsapp,
+        to=to_whatsapp
     )
 
 
-# -------------------------
-# BOT
-# -------------------------
+def iniciar_driver():
 
-def buscar_actos():
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
-    historial = cargar_historial()
-    nuevos = []
-    encontrados = []
+    driver = webdriver.Chrome(options=options)
 
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
+    return driver
 
-    driver = webdriver.Chrome(options=chrome_options)
 
-    wait = WebDriverWait(driver, 20)
+def login(driver):
 
     print("Abriendo portal...")
 
-    driver.get("https://misservicios.abc.gob.ar")
-
-    # usuario
-    usuario = wait.until(
-        EC.presence_of_element_located((By.NAME, "Ecom_User_ID"))
-    )
-    usuario.send_keys(ABC_USER)
-
-    # contraseña
-    password = driver.find_element(By.NAME, "Ecom_Password")
-    password.send_keys(ABC_PASS)
-
-    # botón login
-    boton = wait.until(
-        EC.element_to_be_clickable((By.ID, "loginButton2"))
-    )
-    boton.click()
-
-    print("Login realizado")
+    driver.get("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
 
     time.sleep(5)
+
+    print("Intentando login...")
+
+    usuario = driver.find_element(By.NAME, "Ecom_User_ID")
+    password = driver.find_element(By.NAME, "Ecom_Password")
+
+    usuario.send_keys(os.environ.get("ABC_USER"))
+    password.send_keys(os.environ.get("ABC_PASS"))
+
+    password.send_keys(Keys.ENTER)
+
+    time.sleep(8)
+
+
+def buscar_actos():
+
+    driver = iniciar_driver()
+
+    login(driver)
+
+    print("Entrando a actos publicados...")
 
     driver.get(
-        "https://misservicios.abc.gob.ar/actos.publicos.digitales/#/busqueda"
+        "https://misservicios.abc.gob.ar/actos.publicos.digitales/#/actosPublicos"
     )
 
-    time.sleep(5)
+    time.sleep(10)
 
-    cards = driver.find_elements(By.CLASS_NAME, "card")
+    actos = driver.find_elements(By.CSS_SELECTOR, "tbody tr")
 
-    for c in cards:
+    historial = cargar_historial()
 
-        texto = c.text
+    nuevos = []
 
-        for d in DISTRITOS:
+    for a in actos:
 
-            if d in texto:
+        columnas = a.find_elements(By.TAG_NAME, "td")
 
-                identificador = texto[:50]
+        if len(columnas) < 6:
+            continue
 
-                encontrados.append(identificador)
+        establecimiento = columnas[1].text
+        distrito = columnas[2].text
+        cargo = columnas[3].text
+        fecha = columnas[5].text
 
-                if identificador not in historial:
+        identificador = establecimiento + cargo + fecha
 
-                    nuevos.append(texto)
+        if distrito not in DISTRITOS:
+            continue
 
-    driver.quit()
+        if identificador not in historial:
+
+            nuevos.append({
+                "establecimiento": establecimiento,
+                "distrito": distrito,
+                "cargo": cargo,
+                "fecha": fecha
+            })
+
+            historial.append(identificador)
 
     if nuevos:
 
-        msg = "📢 ACTOS PUBLICOS NUEVOS\n\n"
+        msg = "📢 ACTOS PUBLICOS\n\n"
 
         for n in nuevos:
 
-            msg += n + "\n\n"
+            msg += (
+                f"🏫 {n['establecimiento']}\n"
+                f"📍 {n['distrito']}\n"
+                f"📚 {n['cargo']}\n"
+                f"⏰ {n['fecha']}\n\n"
+            )
 
         enviar_whatsapp(msg)
 
@@ -256,13 +254,10 @@ def buscar_actos():
 
         print("Sin novedades")
 
-    guardar_historial(encontrados)
+    guardar_historial(historial)
 
+    driver.quit()
 
-# -------------------------
-# MAIN
-# -------------------------
 
 if __name__ == "__main__":
-
     buscar_actos()
