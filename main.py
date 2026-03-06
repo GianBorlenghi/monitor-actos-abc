@@ -1,18 +1,15 @@
-
+import os
 from playwright.sync_api import sync_playwright
 from twilio.rest import Client
-
-USUARIO = "TU_USUARIO"
-PASSWORD = "TU_PASSWORD"
 
 DISTRITOS = ["PERGAMINO", "SALTO", "ROJAS"]
 
 def enviar_whatsapp(mensaje):
 
-    account_sid = "TWILIO_SID"
-    auth_token = "TWILIO_TOKEN"
+    sid = os.getenv("TWILIO_SID")
+    token = os.getenv("TWILIO_TOKEN")
 
-    client = Client(account_sid, auth_token)
+    client = Client(sid, token)
 
     client.messages.create(
         from_='whatsapp:+14155238886',
@@ -20,18 +17,20 @@ def enviar_whatsapp(mensaje):
         to='whatsapp:+549TU_NUMERO'
     )
 
-
 def revisar():
+
+    usuario = os.getenv("ABC_USER")
+    password = os.getenv("ABC_PASS")
 
     with sync_playwright() as p:
 
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        page.goto("https://abc.gob.ar")
+        page.goto("URL_LOGIN_ABC")
 
-        page.fill('input[name="username"]', USUARIO)
-        page.fill('input[name="password"]', PASSWORD)
+        page.fill('input[name="username"]', usuario)
+        page.fill('input[name="password"]', password)
 
         page.click('button[type="submit"]')
 
@@ -39,15 +38,12 @@ def revisar():
 
         page.goto("URL_ACTOS_PUBLICOS")
 
-        contenido = page.content()
-
-        texto = contenido.upper()
+        contenido = page.content().upper()
 
         for d in DISTRITOS:
-            if d in texto:
-                enviar_whatsapp(f"Nuevo cargo en {d}")
+            if d in contenido:
+                enviar_whatsapp(f"Nuevo cargo encontrado en {d}")
 
         browser.close()
-
 
 revisar()
