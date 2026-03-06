@@ -2,3 +2,4 @@ requests
 twilio
 httpx
 urllib3
+selenium
