@@ -108,176 +108,66 @@ def revisar():
 if __name__ == "__main__":
     revisar()'''
 
-import requests
-import json
-from twilio.rest import Client
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+import time
 import os
-import ssl
-from requests.adapters import HTTPAdapter
-from urllib3.poolmanager import PoolManager
+from twilio.rest import Client
 
-# --- CONFIGURACIÓN ---
-DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
-HISTORIAL_FILE = "historial.json"
-MAX_PAGINAS = 50
+USUARIO = os.environ["ABC_USER"]
+PASSWORD = os.environ["ABC_PASS"]
 
+TWILIO_SID = os.environ["TWILIO_SID"]
+TWILIO_AUTH = os.environ["TWILIO_AUTH"]
+TWILIO_FROM = os.environ["TWILIO_FROM"]
+TWILIO_TO = os.environ["TWILIO_TO"]
 
-# --- Adapter SSL compatible ---
-class TLSAdapter(HTTPAdapter):
-    def init_poolmanager(self, connections, maxsize, block=False):
-        ctx = ssl.create_default_context()
-        ctx.set_ciphers("DEFAULT@SECLEVEL=1")  # permite ciphers viejos del servidor
-        self.poolmanager = PoolManager(
-            num_pools=connections,
-            maxsize=maxsize,
-            block=block,
-            ssl_context=ctx
-        )
-
-
-# --- sesión HTTP ---
-session = requests.Session()
-session.mount("https://", TLSAdapter())
-
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Content-Type": "application/json",
-    "Origin": "https://misservicios.abc.gob.ar",
-    "Referer": "https://misservicios.abc.gob.ar/actos.publicos.digitales/"
-})
-
-
-# --- HISTORIAL ---
-def cargar_historial():
-    if not os.path.exists(HISTORIAL_FILE):
-        return {}
-
-    with open(HISTORIAL_FILE, "r") as f:
-        data = json.load(f)
-
-    return {item["id"]: item["fechaCierre"] for item in data}
-
-
-def guardar_historial(historial):
-    data = [{"id": k, "fechaCierre": v} for k, v in historial.items()]
-
-    with open(HISTORIAL_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-# --- WHATSAPP ---
 def enviar_whatsapp(msg):
-
-    sid = os.environ.get("TWILIO_SID")
-    auth = os.environ.get("TWILIO_AUTH")
-    from_whatsapp = os.environ.get("TWILIO_FROM")
-    to_whatsapp = os.environ.get("TWILIO_TO")
-
-    if not sid:
-        print("⚠️ Twilio no configurado")
-        return
-
-    client = Client(sid, auth)
-
+    client = Client(TWILIO_SID, TWILIO_AUTH)
     client.messages.create(
         body=msg,
-        from_=from_whatsapp,
-        to=to_whatsapp
+        from_=TWILIO_FROM,
+        to=TWILIO_TO
     )
 
+def buscar_actos():
 
-# --- CONSULTAR API ---
-def consultar_api(pagina):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
 
-    url = "https://misservicios.abc.gob.ar/actos.publicos.digitales/api/busqueda"
-
-    payload = {
-        "page": pagina,
-        "estado": "PUBLICADA"
-    }
+    driver = webdriver.Chrome(options=chrome_options)
 
     try:
 
-        r = session.post(url, json=payload, timeout=20)
+        driver.get("https://misservicios.abc.gob.ar")
 
-        print("status:", r.status_code)
+        time.sleep(3)
 
-        if r.status_code != 200:
-            print("respuesta:", r.text[:300])
-            return {"data": []}
+        driver.find_element(By.NAME, "Ecom_User_ID").send_keys(USUARIO)
+        driver.find_element(By.NAME, "Ecom_Password").send_keys(PASSWORD)
 
-        try:
-            return r.json()
-        except:
-            print("⚠️ la respuesta no es JSON")
-            print(r.text[:500])
-            return {"data": []}
+        driver.find_element(By.NAME, "login").click()
 
-    except Exception as e:
+        time.sleep(5)
 
-        print("❌ Error al consultar API:", e)
-        return {"data": []}
+        driver.get("https://misservicios.abc.gob.ar/actos.publicos.digitales")
 
-# --- BOT PRINCIPAL ---
-def revisar():
+        time.sleep(5)
 
-    historial = cargar_historial()
-    encontrados = dict(historial)
+        html = driver.page_source
 
-    nuevos = []
+        if "cargo" in html.lower():
+            enviar_whatsapp("⚠️ Hay nuevos actos públicos publicados")
 
-    pagina = 1
+            print("mensaje enviado")
+        else:
+            print("sin novedades")
 
-    while pagina <= MAX_PAGINAS:
-
-        data = consultar_api(pagina)
-
-        resultados = data.get("data", [])
-
-        if not resultados:
-            break
-
-        for r in resultados:
-
-            distrito = r.get("distrito", "").upper()
-
-            if distrito not in DISTRITOS:
-                continue
-
-            id_acto = str(r.get("id"))
-            fecha = r.get("fechaCierre")
-
-            encontrados[id_acto] = fecha
-
-            if id_acto not in historial:
-                nuevos.append(r)
-
-        pagina += 1
-
-    if nuevos:
-
-        msg = "📢 ACTOS PUBLICOS NUEVOS\n\n"
-
-        for n in nuevos:
-
-            msg += (
-                f"🏫 {n.get('establecimiento')}\n"
-                f"📍 {n.get('distrito')}\n"
-                f"📚 {n.get('cargo')}\n"
-                f"⏰ {n.get('fechaCierre')}\n\n"
-            )
-
-        enviar_whatsapp(msg)
-
-        print("✅ WhatsApp enviado:", len(nuevos))
-
-    else:
-
-        print("ℹ️ Sin novedades")
-
-    guardar_historial(encontrados)
+    finally:
+        driver.quit()
 
 
 if __name__ == "__main__":
-    revisar()
+    buscar_actos()
