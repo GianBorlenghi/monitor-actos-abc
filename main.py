@@ -1,126 +1,51 @@
+import requests
+import json
 import os
-from playwright.sync_api import sync_playwright
-from twilio.rest import Client
 
-DISTRITOS = ["PERGAMINO", "SALTO", "ROJAS"]
-ARCHIVO_CARGOS = "historial.txt"
+# distritos a buscar
+DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
 
+# tu whatsapp (callmebot)
+PHONE = os.environ.get("PHONE")
+APIKEY = os.environ.get("APIKEY")
 
-def enviar_whatsapp(mensaje):
-
-    sid = os.getenv("TWILIO_SID")
-    token = os.getenv("TWILIO_TOKEN")
-    from_number = os.getenv("TWILIO_FROM")
-    to_number = os.getenv("TWILIO_TO")
-
-    client = Client(sid, token)
-
-    client.messages.create(
-        from_=from_number,
-        body=mensaje,
-        to=to_number
-    )
+HISTORIAL = "historial.json"
 
 
 def cargar_historial():
 
-    if not os.path.exists(ARCHIVO_CARGOS):
-        return set()
+    if not os.path.exists(HISTORIAL):
+        return []
 
-    with open(ARCHIVO_CARGOS, "r") as f:
-        return set(f.read().splitlines())
-
-
-def guardar_historial(lista):
-
-    with open(ARCHIVO_CARGOS, "a") as f:
-        for item in lista:
-            f.write(item + "\n")
+    with open(HISTORIAL) as f:
+        return json.load(f)
 
 
-def cerrar_popup(page):
+def guardar_historial(data):
 
-    if page.locator(".modal.show").count() > 0:
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(2000)
-
-
-def filtrar_estado(page):
-
-    page.click('button[data-target=".autocomplete-estado-modal"]')
-
-    page.wait_for_selector("#autocompleteEstadoQuery")
-
-    page.fill("#autocompleteEstadoQuery", "PUBLICADA")
-
-    page.keyboard.press("Enter")
-
-    page.wait_for_timeout(3000)
+    with open(HISTORIAL, "w") as f:
+        json.dump(data, f)
 
 
-def limpiar_distrito(page):
+def enviar_whatsapp(msg):
 
-    try:
-        page.click('button[data-target=".autocomplete-distrito-modal"]')
-        page.wait_for_selector("#autocompleteDistritoQuery")
-        page.fill("#autocompleteDistritoQuery", "")
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(2000)
-    except:
-        pass
+    url = f"https://api.callmebot.com/whatsapp.php?phone={PHONE}&text={msg}&apikey={APIKEY}"
+
+    requests.get(url)
 
 
-def filtrar_distrito(page, distrito):
+def consultar_api(pagina):
 
-    page.click('button[data-target=".autocomplete-distrito-modal"]')
+    url = "https://misservicios.abc.gob.ar/actos.publicos.digitales/api/busqueda"
 
-    page.wait_for_selector("#autocompleteDistritoQuery")
+    payload = {
+        "page": pagina,
+        "estado": "PUBLICADA"
+    }
 
-    page.fill("#autocompleteDistritoQuery", distrito)
+    r = requests.post(url, json=payload)
 
-    page.keyboard.press("Enter")
-
-    page.wait_for_timeout(4000)
-
-
-def leer_tabla(page):
-
-    resultados = []
-
-    while True:
-
-        page.wait_for_selector("table tbody tr")
-
-        filas = page.query_selector_all("table tbody tr")
-
-        for fila in filas:
-
-            columnas = fila.query_selector_all("td")
-
-            if len(columnas) < 5:
-                continue
-
-            distrito = columnas[0].inner_text().strip().upper()
-            escuela = columnas[1].inner_text().strip()
-            cargo = columnas[2].inner_text().strip()
-            cierre = columnas[4].inner_text().strip()
-
-            resultados.append({
-                "distrito": distrito,
-                "escuela": escuela,
-                "cargo": cargo,
-                "cierre": cierre
-            })
-
-        siguiente = page.locator('li.paginate_button.next:not(.disabled)')
-
-        if siguiente.count() > 0:
-            siguiente.click()
-            page.wait_for_timeout(3000)
-        else:
-            break
-
-    return resultados
+    return r.json()
 
 
 def revisar():
@@ -130,65 +55,56 @@ def revisar():
     nuevos = []
     encontrados = []
 
-    with sync_playwright() as p:
+    pagina = 1
 
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+    while True:
 
-        print("Entrando a la web")
+        data = consultar_api(pagina)
 
-        page.goto("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
+        resultados = data["data"]
 
-        page.wait_for_timeout(6000)
+        if not resultados:
+            break
 
-        cerrar_popup(page)
+        for r in resultados:
 
-        filtrar_estado(page)
+            distrito = r["distrito"]
 
-        for distrito in DISTRITOS:
+            if distrito not in DISTRITOS:
+                continue
 
-            print("Buscando distrito:", distrito)
+            identificador = f"{r['id']}"
 
-            limpiar_distrito(page)
+            encontrados.append(identificador)
 
-            filtrar_distrito(page, distrito)
+            if identificador not in historial:
 
-            resultados = leer_tabla(page)
+                nuevos.append(r)
 
-            for r in resultados:
+        pagina += 1
 
-                identificador = f"{r['distrito']}-{r['escuela']}-{r['cargo']}-{r['cierre']}"
+    if nuevos:
 
-                encontrados.append(identificador)
+        msg = "📢 ACTOS PUBLICOS\n\n"
 
-                if identificador not in historial:
+        for n in nuevos:
 
-                    nuevos.append(r)
+            msg += (
+                f"🏫 {n['establecimiento']}\n"
+                f"📍 {n['distrito']}\n"
+                f"📚 {n['cargo']}\n"
+                f"⏰ {n['fechaCierre']}\n\n"
+            )
 
-        if nuevos:
+        enviar_whatsapp(msg)
 
-            mensaje = "📢 ACTOS PUBLICOS ABC\n\n"
+        print("WhatsApp enviado")
 
-            for c in nuevos:
+    else:
+        print("Sin novedades")
 
-                mensaje += (
-                    f"🏫 {c['escuela']}\n"
-                    f"📍 {c['distrito']}\n"
-                    f"📚 {c['cargo']}\n"
-                    f"⏰ {c['cierre']}\n\n"
-                )
-
-            enviar_whatsapp(mensaje)
-
-            guardar_historial(encontrados)
-
-            print("WhatsApp enviado")
-
-        else:
-
-            print("No hay cargos nuevos")
-
-        browser.close()
+    guardar_historial(encontrados)
 
 
-revisar()
+if __name__ == "__main__":
+    revisar()
