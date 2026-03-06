@@ -1,4 +1,4 @@
-import httpx
+'''import httpx
 import json
 from twilio.rest import Client
 import os
@@ -105,5 +105,171 @@ def revisar():
     guardar_historial(encontrados)
 
 # --- Ejecutar ---
+if __name__ == "__main__":
+    revisar()'''
+
+import requests
+import json
+from twilio.rest import Client
+import os
+import ssl
+from requests.adapters import HTTPAdapter
+from urllib3.poolmanager import PoolManager
+
+# --- CONFIGURACIÓN ---
+DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
+HISTORIAL_FILE = "historial.json"
+MAX_PAGINAS = 50
+
+
+# --- Adapter SSL compatible ---
+class TLSAdapter(HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False):
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers("DEFAULT@SECLEVEL=1")  # permite ciphers viejos del servidor
+        self.poolmanager = PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            ssl_context=ctx
+        )
+
+
+# --- sesión HTTP ---
+session = requests.Session()
+session.mount("https://", TLSAdapter())
+
+session.headers.update({
+    "User-Agent": "Mozilla/5.0",
+    "Accept": "application/json, text/plain, */*",
+    "Content-Type": "application/json"
+})
+
+
+# --- HISTORIAL ---
+def cargar_historial():
+    if not os.path.exists(HISTORIAL_FILE):
+        return {}
+
+    with open(HISTORIAL_FILE, "r") as f:
+        data = json.load(f)
+
+    return {item["id"]: item["fechaCierre"] for item in data}
+
+
+def guardar_historial(historial):
+    data = [{"id": k, "fechaCierre": v} for k, v in historial.items()]
+
+    with open(HISTORIAL_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+# --- WHATSAPP ---
+def enviar_whatsapp(msg):
+
+    sid = os.environ.get("TWILIO_SID")
+    auth = os.environ.get("TWILIO_AUTH")
+    from_whatsapp = os.environ.get("TWILIO_FROM")
+    to_whatsapp = os.environ.get("TWILIO_TO")
+
+    if not sid:
+        print("⚠️ Twilio no configurado")
+        return
+
+    client = Client(sid, auth)
+
+    client.messages.create(
+        body=msg,
+        from_=from_whatsapp,
+        to=to_whatsapp
+    )
+
+
+# --- CONSULTAR API ---
+def consultar_api(pagina):
+
+    url = "https://misservicios.abc.gob.ar/actos.publicos.digitales/api/busqueda"
+
+    payload = {
+        "page": pagina,
+        "estado": "PUBLICADA"
+    }
+
+    try:
+
+        r = session.post(url, json=payload, timeout=20)
+
+        if r.status_code != 200:
+            print("⚠️ status:", r.status_code)
+            return {"data": []}
+
+        return r.json()
+
+    except Exception as e:
+
+        print("❌ Error al consultar API:", e)
+        return {"data": []}
+
+
+# --- BOT PRINCIPAL ---
+def revisar():
+
+    historial = cargar_historial()
+    encontrados = dict(historial)
+
+    nuevos = []
+
+    pagina = 1
+
+    while pagina <= MAX_PAGINAS:
+
+        data = consultar_api(pagina)
+
+        resultados = data.get("data", [])
+
+        if not resultados:
+            break
+
+        for r in resultados:
+
+            distrito = r.get("distrito", "").upper()
+
+            if distrito not in DISTRITOS:
+                continue
+
+            id_acto = str(r.get("id"))
+            fecha = r.get("fechaCierre")
+
+            encontrados[id_acto] = fecha
+
+            if id_acto not in historial:
+                nuevos.append(r)
+
+        pagina += 1
+
+    if nuevos:
+
+        msg = "📢 ACTOS PUBLICOS NUEVOS\n\n"
+
+        for n in nuevos:
+
+            msg += (
+                f"🏫 {n.get('establecimiento')}\n"
+                f"📍 {n.get('distrito')}\n"
+                f"📚 {n.get('cargo')}\n"
+                f"⏰ {n.get('fechaCierre')}\n\n"
+            )
+
+        enviar_whatsapp(msg)
+
+        print("✅ WhatsApp enviado:", len(nuevos))
+
+    else:
+
+        print("ℹ️ Sin novedades")
+
+    guardar_historial(encontrados)
+
+
 if __name__ == "__main__":
     revisar()
