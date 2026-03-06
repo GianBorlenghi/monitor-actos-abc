@@ -1,24 +1,12 @@
-import requests
+import httpx
 import json
 from twilio.rest import Client
 import os
-import ssl
-from requests.adapters import HTTPAdapter
-from urllib3.poolmanager import PoolManager
 
 # --- CONFIGURACIÓN ---
 DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
 HISTORIAL_FILE = "historial.json"
-MAX_PAGINAS = 50  # seguridad para no bucles infinitos
-
-# --- SSL/TLS Adapter para Requests ---
-class TLSAdapter(HTTPAdapter):
-    """Forzar TLS 1.2+"""
-    def init_poolmanager(self, *args, **kwargs):
-        context = ssl.create_default_context()
-        context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
-        kwargs['ssl_context'] = context
-        return super().init_poolmanager(*args, **kwargs)
+MAX_PAGINAS = 50  # límite de seguridad para no bucles infinitos
 
 # --- Funciones de historial ---
 def cargar_historial():
@@ -35,7 +23,7 @@ def guardar_historial(historial_dict):
 # --- Función para enviar WhatsApp ---
 def enviar_whatsapp(msg):
     sid = os.environ.get("TWILIO_SID")
-    auth = os.environ.get("TWILIO_TOKEN")
+    auth = os.environ.get("TWILIO_AUTH")
     from_whatsapp = os.environ.get("TWILIO_FROM")
     to_whatsapp = os.environ.get("TWILIO_TO")
 
@@ -51,14 +39,14 @@ def enviar_whatsapp(msg):
     )
 
 # --- Función para consultar la API ---
-def consultar_api(pagina, session):
+def consultar_api(pagina, client):
     url = "https://misservicios.abc.gob.ar/actos.publicos.digitales/api/busqueda"
     payload = {"page": pagina, "estado": "PUBLICADA"}
     try:
-        r = session.post(url, json=payload, timeout=15)
+        r = client.post(url, json=payload, timeout=15)
         r.raise_for_status()
         return r.json()
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         print(f"❌ Error al consultar API: {e}")
         return {"data": []}
 
@@ -68,38 +56,38 @@ def revisar():
     encontrados = dict(historial)  # copia para actualizar
     nuevos = []
 
-    # --- Session con TLS y headers ---
-    session = requests.Session()
-    session.mount("https://", TLSAdapter())
-    session.headers.update({
+    # --- Cliente HTTPX con headers tipo navegador ---
+    headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                       "(KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*"
-    })
+    }
 
-    pagina = 1
-    while pagina <= MAX_PAGINAS:
-        data = consultar_api(pagina, session)
-        resultados = data.get("data", [])
+    with httpx.Client(timeout=15, headers=headers, verify=True) as client:
+        pagina = 1
+        while pagina <= MAX_PAGINAS:
+            data = consultar_api(pagina, client)
+            resultados = data.get("data", [])
 
-        if not resultados:
-            break
+            if not resultados:
+                break
 
-        for r in resultados:
-            distrito = r.get("distrito", "").upper()
-            if distrito not in DISTRITOS:
-                continue
+            for r in resultados:
+                distrito = r.get("distrito", "").upper()
+                if distrito not in DISTRITOS:
+                    continue
 
-            identificador = str(r.get("id"))
-            fechaCierre = r.get("fechaCierre", "")
+                identificador = str(r.get("id"))
+                fechaCierre = r.get("fechaCierre", "")
 
-            encontrados[identificador] = fechaCierre
+                encontrados[identificador] = fechaCierre
 
-            if identificador not in historial:
-                nuevos.append(r)
+                if identificador not in historial:
+                    nuevos.append(r)
 
-        pagina += 1
+            pagina += 1
 
+    # --- Enviar WhatsApp si hay nuevos cargos ---
     if nuevos:
         msg = "📢 ACTOS PÚBLICOS NUEVOS\n\n"
         for n in nuevos:
