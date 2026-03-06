@@ -107,7 +107,6 @@ def revisar():
 # --- Ejecutar ---
 if __name__ == "__main__":
     revisar()'''
-
 import time
 import json
 import os
@@ -178,7 +177,7 @@ def login(driver):
 
     driver.get("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
 
-    wait = WebDriverWait(driver, 20)
+    wait = WebDriverWait(driver, 30)
 
     usuario = wait.until(
         EC.presence_of_element_located((By.NAME, "Ecom_User_ID"))
@@ -191,24 +190,23 @@ def login(driver):
 
     password.send_keys(Keys.ENTER)
 
-    time.sleep(10)
+    time.sleep(8)
 
 
 def aplicar_estado(driver):
 
+    wait = WebDriverWait(driver, 20)
+
     print("Abriendo filtro estado")
 
-    boton = driver.find_element(
-        By.CSS_SELECTOR,
-        "button[data-target='.autocomplete-estado-modal']"
-    )
+    botones = driver.find_elements(By.CSS_SELECTOR, "button.btnFiltro")
 
-    boton.click()
+    boton_estado = botones[1]
 
-    wait = WebDriverWait(driver, 10)
+    driver.execute_script("arguments[0].click();", boton_estado)
 
     estado = wait.until(
-        EC.element_to_be_clickable((By.ID, "autocompleteEstadoQuery"))
+        EC.visibility_of_element_located((By.ID, "autocompleteEstadoQuery"))
     )
 
     estado.send_keys("PUBLICADA")
@@ -217,24 +215,23 @@ def aplicar_estado(driver):
 
     estado.send_keys(Keys.ENTER)
 
-    time.sleep(4)
+    time.sleep(3)
 
 
 def aplicar_distrito(driver, distrito):
 
+    wait = WebDriverWait(driver, 20)
+
     print("Buscando distrito:", distrito)
 
-    boton = driver.find_element(
-        By.CSS_SELECTOR,
-        "button[data-target='.autocomplete-distrito-modal']"
-    )
+    botones = driver.find_elements(By.CSS_SELECTOR, "button.btnFiltro")
 
-    boton.click()
+    boton_distrito = botones[0]
 
-    wait = WebDriverWait(driver, 10)
+    driver.execute_script("arguments[0].click();", boton_distrito)
 
     dist = wait.until(
-        EC.element_to_be_clickable((By.ID, "autocompleteDistritoQuery"))
+        EC.visibility_of_element_located((By.ID, "autocompleteDistritoQuery"))
     )
 
     dist.clear()
@@ -244,7 +241,7 @@ def aplicar_distrito(driver, distrito):
 
     dist.send_keys(Keys.ENTER)
 
-    time.sleep(6)
+    time.sleep(5)
 
 
 def leer_tabla(driver):
