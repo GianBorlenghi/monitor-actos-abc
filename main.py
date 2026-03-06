@@ -68,8 +68,16 @@ page = browser.new_page()
         if page.locator("#popUpModal").is_visible():
     page.keyboard.press("Escape")
         # FILTRO ESTADO PUBLICADA
-        page.click('button[data-target=".autocomplete-estado-modal"]')
+page.wait_for_timeout(5000)
 
+# cerrar cualquier modal
+modales = page.locator(".modal.show")
+
+if modales.count() > 0:
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(2000)
+
+page.locator('button:has-text("FILTRAR")').click()
         page.wait_for_selector("#autocompleteEstadoQuery")
 
         page.fill("#autocompleteEstadoQuery", "PUBLICADA")
