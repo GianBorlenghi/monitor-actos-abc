@@ -1,11 +1,9 @@
 import os
-import requests
+from playwright.sync_api import sync_playwright
 from twilio.rest import Client
 
 DISTRITOS = ["PERGAMINO", "SALTO", "ROJAS"]
 ARCHIVO_CARGOS = "cargos_guardados.txt"
-
-API_URL = "https://misservicios.abc.gob.ar/actos.publicos.digitales/api/ofertas"
 
 
 def enviar_whatsapp(mensaje):
@@ -26,11 +24,11 @@ def enviar_whatsapp(mensaje):
 
 def cargar_historial():
 
-    try:
-        with open(ARCHIVO_CARGOS, "r") as f:
-            return set(f.read().splitlines())
-    except:
+    if not os.path.exists(ARCHIVO_CARGOS):
         return set()
+
+    with open(ARCHIVO_CARGOS, "r") as f:
+        return set(f.read().splitlines())
 
 
 def guardar_historial(cargo):
@@ -39,66 +37,96 @@ def guardar_historial(cargo):
         f.write(cargo + "\n")
 
 
-def obtener_cargos():
-
-    params = {
-        "estado": "PUBLICADA",
-        "page": 0,
-        "size": 100
-    }
-
-    r = requests.get(API_URL, params=params)
-
-    return r.json()
-
-
 def revisar():
+
+    usuario = os.getenv("ABC_USER")
+    password = os.getenv("ABC_PASS")
 
     historial = cargar_historial()
 
-    datos = obtener_cargos()
+    with sync_playwright() as p:
 
-    nuevos = []
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-    for oferta in datos["content"]:
+        # LOGIN
+        page.goto("https://login.abc.gob.ar/nidp/idff/sso?id=ABC-Form&sid=0&option=credential&sid=0&target=https://menu.abc.gob.ar/")
 
-        distrito = oferta["distrito"].upper()
+        page.wait_for_selector("#Ecom_User_ID")
 
-        if distrito not in DISTRITOS:
-            continue
+        page.fill("#Ecom_User_ID", usuario)
+        page.fill("#Ecom_Password", password)
 
-        escuela = oferta["establecimiento"]
-        cargo = oferta["cargo"]
-        cierre = oferta["fechaCierre"]
+        page.click('a:has-text("ENTRAR")')
 
-        identificador = f"{distrito}-{escuela}-{cargo}-{cierre}"
+        page.wait_for_timeout(7000)
 
-        if identificador not in historial:
+        # ACTOS PUBLICOS
+        page.goto("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
 
-            nuevos.append({
-                "distrito": distrito,
-                "escuela": escuela,
-                "cargo": cargo,
-                "cierre": cierre
-            })
+        page.wait_for_timeout(8000)
 
-            guardar_historial(identificador)
+        # FILTRO ESTADO PUBLICADA
+        page.click('button[data-target=".autocomplete-estado-modal"]')
 
-    if nuevos:
+        page.wait_for_selector("#autocompleteEstadoQuery")
 
-        mensaje = "📢 NUEVOS ACTOS PUBLICOS\n\n"
+        page.fill("#autocompleteEstadoQuery", "PUBLICADA")
 
-        for c in nuevos:
+        page.keyboard.press("Enter")
 
-            mensaje += (
-                f"🏫 Escuela: {c['escuela']}\n"
-                f"📍 Distrito: {c['distrito']}\n"
-                f"📚 Cargo: {c['cargo']}\n"
-                f"⏰ Cierre: {c['cierre']}\n\n"
-            )
+        page.wait_for_timeout(4000)
 
-        enviar_whatsapp(mensaje)
+        # TABLA
+        page.wait_for_selector("table tbody tr")
+
+        filas = page.query_selector_all("table tbody tr")
+
+        nuevos_cargos = []
+
+        for fila in filas:
+
+            columnas = fila.query_selector_all("td")
+
+            if len(columnas) < 5:
+                continue
+
+            distrito = columnas[0].inner_text().strip().upper()
+            escuela = columnas[1].inner_text().strip()
+            cargo = columnas[2].inner_text().strip()
+            cierre = columnas[4].inner_text().strip()
+
+            if distrito in DISTRITOS:
+
+                identificador = f"{distrito}-{escuela}-{cargo}-{cierre}"
+
+                if identificador not in historial:
+
+                    nuevos_cargos.append({
+                        "distrito": distrito,
+                        "escuela": escuela,
+                        "cargo": cargo,
+                        "cierre": cierre
+                    })
+
+                    guardar_historial(identificador)
+
+        if nuevos_cargos:
+
+            mensaje = "📢 NUEVOS ACTOS PUBLICOS\n\n"
+
+            for c in nuevos_cargos:
+
+                mensaje += (
+                    f"🏫 Escuela: {c['escuela']}\n"
+                    f"📍 Distrito: {c['distrito']}\n"
+                    f"📚 Cargo: {c['cargo']}\n"
+                    f"⏰ Cierre: {c['cierre']}\n\n"
+                )
+
+            enviar_whatsapp(mensaje)
+
+        browser.close()
 
 
-if __name__ == "__main__":
-    revisar()
+revisar()
