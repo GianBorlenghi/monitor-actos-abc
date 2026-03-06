@@ -140,9 +140,11 @@ session = requests.Session()
 session.mount("https://", TLSAdapter())
 
 session.headers.update({
-    "User-Agent": "Mozilla/5.0",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "Origin": "https://misservicios.abc.gob.ar",
+    "Referer": "https://misservicios.abc.gob.ar/actos.publicos.digitales/"
 })
 
 
@@ -199,17 +201,23 @@ def consultar_api(pagina):
 
         r = session.post(url, json=payload, timeout=20)
 
+        print("status:", r.status_code)
+
         if r.status_code != 200:
-            print("⚠️ status:", r.status_code)
+            print("respuesta:", r.text[:300])
             return {"data": []}
 
-        return r.json()
+        try:
+            return r.json()
+        except:
+            print("⚠️ la respuesta no es JSON")
+            print(r.text[:500])
+            return {"data": []}
 
     except Exception as e:
 
         print("❌ Error al consultar API:", e)
         return {"data": []}
-
 
 # --- BOT PRINCIPAL ---
 def revisar():
