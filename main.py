@@ -145,7 +145,7 @@ def guardar_historial(data):
 def enviar_whatsapp(msg):
 
     sid = os.environ.get("TWILIO_SID")
-    token = os.environ.get("TWILIO_AUTH")
+    token = os.environ.get("TWILIO_TOKEN")
     from_whatsapp = os.environ.get("TWILIO_FROM")
     to_whatsapp = os.environ.get("TWILIO_TO")
 
