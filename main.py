@@ -1,5 +1,6 @@
 import requests
 import json
+from twilio.rest import Client
 import os
 
 # distritos a buscar
@@ -29,10 +30,18 @@ def guardar_historial(data):
 
 def enviar_whatsapp(msg):
 
-    url = f"https://api.callmebot.com/whatsapp.php?phone={PHONE}&text={msg}&apikey={APIKEY}"
+    sid = os.environ.get("TWILIO_SID")
+    auth = os.environ.get("TWILIO_TOKEN")
+    from_whatsapp = os.environ.get("TWILIO_FROM")
+    to_whatsapp = os.environ.get("TWILIO_TO")
 
-    requests.get(url)
+    client = Client(sid, auth)
 
+    client.messages.create(
+        body=msg,
+        from_=from_whatsapp,
+        to=to_whatsapp
+    )
 
 def consultar_api(pagina):
 
