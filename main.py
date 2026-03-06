@@ -119,11 +119,14 @@ from selenium.webdriver.common.keys import Keys
 
 from twilio.rest import Client
 
+
 DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
+
 HISTORIAL_FILE = "historial.json"
 
 
 def cargar_historial():
+
     if not os.path.exists(HISTORIAL_FILE):
         return []
 
@@ -132,6 +135,7 @@ def cargar_historial():
 
 
 def guardar_historial(data):
+
     with open(HISTORIAL_FILE, "w") as f:
         json.dump(data, f)
 
@@ -155,11 +159,14 @@ def enviar_whatsapp(msg):
 def iniciar_driver():
 
     options = Options()
+
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    return webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(options=options)
+
+    return driver
 
 
 def login(driver):
@@ -181,24 +188,43 @@ def login(driver):
     time.sleep(8)
 
 
-def buscar_distrito(driver, distrito):
+def aplicar_estado(driver):
 
-    print("Buscando:", distrito)
+    print("Aplicando estado PUBLICADA")
 
-    caja = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Distrito']")
+    estado = driver.find_element(By.ID, "autocompleteEstadoQuery")
 
-    caja.clear()
-    caja.send_keys(distrito)
+    estado.clear()
+    estado.send_keys("PUBLICADA")
 
     time.sleep(2)
 
-    caja.send_keys(Keys.ENTER)
+    estado.send_keys(Keys.ENTER)
 
-    time.sleep(5)
+    time.sleep(3)
+
+
+def aplicar_distrito(driver, distrito):
+
+    print("Buscando distrito:", distrito)
+
+    dist = driver.find_element(By.ID, "autocompleteDistritoQuery")
+
+    dist.clear()
+    dist.send_keys(distrito)
+
+    time.sleep(2)
+
+    dist.send_keys(Keys.ENTER)
+
+    time.sleep(6)
+
+
+def leer_tabla(driver):
 
     filas = driver.find_elements(By.CSS_SELECTOR, "tbody tr")
 
-    resultados = []
+    datos = []
 
     for f in filas:
 
@@ -207,14 +233,19 @@ def buscar_distrito(driver, distrito):
         if len(c) < 6:
             continue
 
-        resultados.append({
-            "establecimiento": c[1].text,
-            "distrito": c[2].text,
-            "cargo": c[3].text,
-            "fecha": c[5].text
+        establecimiento = c[1].text
+        distrito = c[2].text.upper()
+        cargo = c[3].text
+        fecha = c[5].text
+
+        datos.append({
+            "establecimiento": establecimiento,
+            "distrito": distrito,
+            "cargo": cargo,
+            "fecha": fecha
         })
 
-    return resultados
+    return datos
 
 
 def buscar_actos():
@@ -223,22 +254,28 @@ def buscar_actos():
 
     login(driver)
 
-    print("Entrando a actos públicos...")
+    print("Entrando a actos públicos")
 
     driver.get(
         "https://misservicios.abc.gob.ar/actos.publicos.digitales/#/actosPublicos"
     )
 
-    time.sleep(10)
+    time.sleep(12)
+
+    aplicar_estado(driver)
 
     historial = cargar_historial()
 
-    nuevos = []
     encontrados = []
+    nuevos = []
 
     for d in DISTRITOS:
 
-        resultados = buscar_distrito(driver, d)
+        aplicar_distrito(driver, d)
+
+        resultados = leer_tabla(driver)
+
+        print("Filas encontradas:", len(resultados))
 
         for r in resultados:
 
@@ -247,11 +284,12 @@ def buscar_actos():
             encontrados.append(identificador)
 
             if identificador not in historial:
+
                 nuevos.append(r)
 
     if nuevos:
 
-        msg = "📢 ACTOS PUBLICOS\n\n"
+        msg = "📢 ACTOS PUBLICOS NUEVOS\n\n"
 
         for n in nuevos:
 
