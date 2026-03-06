@@ -117,6 +117,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 from twilio.rest import Client
 
 
@@ -175,9 +178,12 @@ def login(driver):
 
     driver.get("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
 
-    time.sleep(5)
+    wait = WebDriverWait(driver, 20)
 
-    usuario = driver.find_element(By.NAME, "Ecom_User_ID")
+    usuario = wait.until(
+        EC.presence_of_element_located((By.NAME, "Ecom_User_ID"))
+    )
+
     password = driver.find_element(By.NAME, "Ecom_Password")
 
     usuario.send_keys(os.environ.get("ABC_USER"))
@@ -185,30 +191,51 @@ def login(driver):
 
     password.send_keys(Keys.ENTER)
 
-    time.sleep(8)
+    time.sleep(10)
 
 
 def aplicar_estado(driver):
 
-    print("Aplicando estado PUBLICADA")
+    print("Abriendo filtro estado")
 
-    estado = driver.find_element(By.ID, "autocompleteEstadoQuery")
+    boton = driver.find_element(
+        By.CSS_SELECTOR,
+        "button[data-target='.autocomplete-estado-modal']"
+    )
 
-    estado.clear()
+    boton.click()
+
+    wait = WebDriverWait(driver, 10)
+
+    estado = wait.until(
+        EC.element_to_be_clickable((By.ID, "autocompleteEstadoQuery"))
+    )
+
     estado.send_keys("PUBLICADA")
 
     time.sleep(2)
 
     estado.send_keys(Keys.ENTER)
 
-    time.sleep(3)
+    time.sleep(4)
 
 
 def aplicar_distrito(driver, distrito):
 
     print("Buscando distrito:", distrito)
 
-    dist = driver.find_element(By.ID, "autocompleteDistritoQuery")
+    boton = driver.find_element(
+        By.CSS_SELECTOR,
+        "button[data-target='.autocomplete-distrito-modal']"
+    )
+
+    boton.click()
+
+    wait = WebDriverWait(driver, 10)
+
+    dist = wait.until(
+        EC.element_to_be_clickable((By.ID, "autocompleteDistritoQuery"))
+    )
 
     dist.clear()
     dist.send_keys(distrito)
