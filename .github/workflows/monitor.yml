@@ -11,7 +11,7 @@ jobs:
 
     steps:
 
-    - name: Descargar repo
+    - name: Clonar repositorio
       uses: actions/checkout@v3
 
     - name: Instalar Python
@@ -26,4 +26,9 @@ jobs:
       run: playwright install
 
     - name: Ejecutar script
+      env:
+        ABC_USER: ${{ secrets.ABC_USER }}
+        ABC_PASS: ${{ secrets.ABC_PASS }}
+        TWILIO_SID: ${{ secrets.TWILIO_SID }}
+        TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
       run: python main.py
