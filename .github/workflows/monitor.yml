@@ -1,34 +1,29 @@
-name: Monitor APD
+name: Monitor Actos ABC
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # cada 15 minutos
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
   run-script:
-
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Clonar repositorio
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Instalar Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Instalar dependencias
+      - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          playwright install chromium
 
-      - name: Instalar navegadores Playwright
-        run: playwright install
-
-      - name: Ejecutar bot
-        run: python main.py
+      - name: Run script
         env:
           ABC_USER: ${{ secrets.ABC_USER }}
           ABC_PASS: ${{ secrets.ABC_PASS }}
@@ -36,3 +31,4 @@ jobs:
           TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
           TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
           TWILIO_TO: ${{ secrets.TWILIO_TO }}
+        run: python main.py}}
