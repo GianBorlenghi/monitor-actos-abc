@@ -1,1 +1,29 @@
+name: Monitor ABC
 
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Descargar repo
+      uses: actions/checkout@v3
+
+    - name: Instalar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Instalar dependencias
+      run: pip install -r requirements.txt
+
+    - name: Instalar Playwright
+      run: playwright install
+
+    - name: Ejecutar script
+      run: python main.py
