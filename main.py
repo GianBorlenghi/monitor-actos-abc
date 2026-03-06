@@ -119,7 +119,6 @@ from selenium.webdriver.common.keys import Keys
 
 from twilio.rest import Client
 
-
 DISTRITOS = ["PERGAMINO", "ROJAS", "SALTO"]
 HISTORIAL_FILE = "historial.json"
 
@@ -127,6 +126,7 @@ HISTORIAL_FILE = "historial.json"
 def cargar_historial():
     if not os.path.exists(HISTORIAL_FILE):
         return []
+
     with open(HISTORIAL_FILE) as f:
         return json.load(f)
 
@@ -159,9 +159,7 @@ def iniciar_driver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    driver = webdriver.Chrome(options=options)
-
-    return driver
+    return webdriver.Chrome(options=options)
 
 
 def login(driver):
@@ -171,8 +169,6 @@ def login(driver):
     driver.get("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
 
     time.sleep(5)
-
-    print("Intentando login...")
 
     usuario = driver.find_element(By.NAME, "Ecom_User_ID")
     password = driver.find_element(By.NAME, "Ecom_Password")
@@ -185,13 +181,49 @@ def login(driver):
     time.sleep(8)
 
 
+def buscar_distrito(driver, distrito):
+
+    print("Buscando:", distrito)
+
+    caja = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Distrito']")
+
+    caja.clear()
+    caja.send_keys(distrito)
+
+    time.sleep(2)
+
+    caja.send_keys(Keys.ENTER)
+
+    time.sleep(5)
+
+    filas = driver.find_elements(By.CSS_SELECTOR, "tbody tr")
+
+    resultados = []
+
+    for f in filas:
+
+        c = f.find_elements(By.TAG_NAME, "td")
+
+        if len(c) < 6:
+            continue
+
+        resultados.append({
+            "establecimiento": c[1].text,
+            "distrito": c[2].text,
+            "cargo": c[3].text,
+            "fecha": c[5].text
+        })
+
+    return resultados
+
+
 def buscar_actos():
 
     driver = iniciar_driver()
 
     login(driver)
 
-    print("Entrando a actos publicados...")
+    print("Entrando a actos públicos...")
 
     driver.get(
         "https://misservicios.abc.gob.ar/actos.publicos.digitales/#/actosPublicos"
@@ -199,39 +231,23 @@ def buscar_actos():
 
     time.sleep(10)
 
-    actos = driver.find_elements(By.CSS_SELECTOR, "tbody tr")
-
     historial = cargar_historial()
 
     nuevos = []
+    encontrados = []
 
-    for a in actos:
+    for d in DISTRITOS:
 
-        columnas = a.find_elements(By.TAG_NAME, "td")
+        resultados = buscar_distrito(driver, d)
 
-        if len(columnas) < 6:
-            continue
+        for r in resultados:
 
-        establecimiento = columnas[1].text
-        distrito = columnas[2].text
-        cargo = columnas[3].text
-        fecha = columnas[5].text
+            identificador = r["establecimiento"] + r["cargo"] + r["fecha"]
 
-        identificador = establecimiento + cargo + fecha
+            encontrados.append(identificador)
 
-        if distrito not in DISTRITOS:
-            continue
-
-        if identificador not in historial:
-
-            nuevos.append({
-                "establecimiento": establecimiento,
-                "distrito": distrito,
-                "cargo": cargo,
-                "fecha": fecha
-            })
-
-            historial.append(identificador)
+            if identificador not in historial:
+                nuevos.append(r)
 
     if nuevos:
 
@@ -254,7 +270,7 @@ def buscar_actos():
 
         print("Sin novedades")
 
-    guardar_historial(historial)
+    guardar_historial(encontrados)
 
     driver.quit()
 
