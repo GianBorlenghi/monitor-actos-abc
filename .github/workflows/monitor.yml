@@ -1,9 +1,8 @@
-name: Monitor ABC
+name: Monitor APD
 
 on:
   schedule:
     - cron: "*/10 * * * *"
-  workflow_dispatch:
 
 jobs:
   run-script:
@@ -11,24 +10,21 @@ jobs:
 
     steps:
 
-    - name: Clonar repositorio
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-    - name: Instalar Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.11"
+      - name: Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-    - name: Instalar dependencias
-      run: pip install -r requirements.txt
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
 
-    - name: Instalar Playwright
-      run: playwright install
-
-    - name: Ejecutar script
-      env:
-        ABC_USER: ${{ secrets.ABC_USER }}
-        ABC_PASS: ${{ secrets.ABC_PASS }}
-        TWILIO_SID: ${{ secrets.TWILIO_SID }}
-        TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
-      run: python main.py
+      - name: Ejecutar bot
+        run: python main.py
+        env:
+          TWILIO_SID: ${{ secrets.TWILIO_SID }}
+          TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
+          TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
+          TWILIO_TO: ${{ secrets.TWILIO_TO }}
