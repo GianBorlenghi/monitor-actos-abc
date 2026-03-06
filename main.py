@@ -38,6 +38,13 @@ def guardar_historial(lista):
             f.write(item + "\n")
 
 
+def cerrar_popup(page):
+
+    if page.locator(".modal.show").count() > 0:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(2000)
+
+
 def filtrar_estado(page):
 
     page.click('button[data-target=".autocomplete-estado-modal"]')
@@ -48,7 +55,19 @@ def filtrar_estado(page):
 
     page.keyboard.press("Enter")
 
-    page.wait_for_timeout(2000)
+    page.wait_for_timeout(3000)
+
+
+def limpiar_distrito(page):
+
+    try:
+        page.click('button[data-target=".autocomplete-distrito-modal"]')
+        page.wait_for_selector("#autocompleteDistritoQuery")
+        page.fill("#autocompleteDistritoQuery", "")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(2000)
+    except:
+        pass
 
 
 def filtrar_distrito(page, distrito):
@@ -66,30 +85,40 @@ def filtrar_distrito(page, distrito):
 
 def leer_tabla(page):
 
-    page.wait_for_selector("table tbody tr")
-
-    filas = page.query_selector_all("table tbody tr")
-
     resultados = []
 
-    for fila in filas:
+    while True:
 
-        columnas = fila.query_selector_all("td")
+        page.wait_for_selector("table tbody tr")
 
-        if len(columnas) < 5:
-            continue
+        filas = page.query_selector_all("table tbody tr")
 
-        distrito = columnas[0].inner_text().strip().upper()
-        escuela = columnas[1].inner_text().strip()
-        cargo = columnas[2].inner_text().strip()
-        cierre = columnas[4].inner_text().strip()
+        for fila in filas:
 
-        resultados.append({
-            "distrito": distrito,
-            "escuela": escuela,
-            "cargo": cargo,
-            "cierre": cierre
-        })
+            columnas = fila.query_selector_all("td")
+
+            if len(columnas) < 5:
+                continue
+
+            distrito = columnas[0].inner_text().strip().upper()
+            escuela = columnas[1].inner_text().strip()
+            cargo = columnas[2].inner_text().strip()
+            cierre = columnas[4].inner_text().strip()
+
+            resultados.append({
+                "distrito": distrito,
+                "escuela": escuela,
+                "cargo": cargo,
+                "cierre": cierre
+            })
+
+        siguiente = page.locator('li.paginate_button.next:not(.disabled)')
+
+        if siguiente.count() > 0:
+            siguiente.click()
+            page.wait_for_timeout(3000)
+        else:
+            break
 
     return resultados
 
@@ -106,24 +135,21 @@ def revisar():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        print("Entrando a ABC...")
+        print("Entrando a la web")
 
         page.goto("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
 
         page.wait_for_timeout(6000)
 
-        # cerrar popup si aparece
-        if page.locator(".modal.show").count() > 0:
-            page.keyboard.press("Escape")
+        cerrar_popup(page)
 
-        page.wait_for_timeout(2000)
-
-        # aplicar filtro estado una sola vez
         filtrar_estado(page)
 
         for distrito in DISTRITOS:
 
-            print("Buscando en:", distrito)
+            print("Buscando distrito:", distrito)
+
+            limpiar_distrito(page)
 
             filtrar_distrito(page, distrito)
 
@@ -141,7 +167,7 @@ def revisar():
 
         if nuevos:
 
-            mensaje = "📢 NUEVOS ACTOS PUBLICOS ABC\n\n"
+            mensaje = "📢 ACTOS PUBLICOS ABC\n\n"
 
             for c in nuevos:
 
@@ -159,7 +185,8 @@ def revisar():
             print("WhatsApp enviado")
 
         else:
-            print("Sin cargos nuevos")
+
+            print("No hay cargos nuevos")
 
         browser.close()
 
