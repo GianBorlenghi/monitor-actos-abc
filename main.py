@@ -46,8 +46,8 @@ def revisar():
 
     with sync_playwright() as p:
 
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+browser = p.chromium.launch(headless=True, args=["--disable-dev-shm-usage"])
+page = browser.new_page()
 
         # LOGIN
         page.goto("https://login.abc.gob.ar/nidp/idff/sso?id=ABC-Form&sid=0&option=credential&sid=0&target=https://menu.abc.gob.ar/")
@@ -65,7 +65,8 @@ def revisar():
         page.goto("https://misservicios.abc.gob.ar/actos.publicos.digitales/")
 
         page.wait_for_timeout(8000)
-
+        if page.locator("#popUpModal").is_visible():
+    page.keyboard.press("Escape")
         # FILTRO ESTADO PUBLICADA
         page.click('button[data-target=".autocomplete-estado-modal"]')
 
