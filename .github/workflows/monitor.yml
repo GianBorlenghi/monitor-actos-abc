@@ -1,34 +1,34 @@
 name: Monitor Actos ABC
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "*/10 * * * *"
-  workflow_dispatch:
 
 jobs:
-  run-script:
+  run:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          playwright install chromium
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
 
-      - name: Run script
-        env:
-          ABC_USER: ${{ secrets.ABC_USER }}
-          ABC_PASS: ${{ secrets.ABC_PASS }}
-          TWILIO_SID: ${{ secrets.TWILIO_SID }}
-          TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
-          TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
-          TWILIO_TO: ${{ secrets.TWILIO_TO }}
-        run: python main.py}}
+    - name: Install deps
+      run: |
+        pip install -r requirements.txt
+        playwright install chromium
+
+    - name: Run script
+      env:
+        TWILIO_SID: ${{ secrets.TWILIO_SID }}
+        TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
+        TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
+        TWILIO_TO: ${{ secrets.TWILIO_TO }}
+      run: python main.py
