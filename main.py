@@ -67,8 +67,23 @@ page = browser.new_page()
         page.wait_for_timeout(8000)
         if page.locator("#popUpModal").is_visible():
     page.keyboard.press("Escape")
-        # FILTRO ESTADO PUBLICADA
+# esperar que cargue
 page.wait_for_timeout(5000)
+
+# eliminar popup molesto del sitio
+page.evaluate("""
+let modal = document.querySelector('#popUpModal');
+if(modal){
+    modal.remove();
+}
+let backdrop = document.querySelector('.modal-backdrop');
+if(backdrop){
+    backdrop.remove();
+}
+""")
+
+# ahora hacer click en FILTRAR
+page.click('button[data-target=".autocomplete-estado-modal"]')
 
 # cerrar cualquier modal
 modales = page.locator(".modal.show")
