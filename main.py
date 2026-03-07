@@ -18,7 +18,7 @@ data = r.json()
 
 ofertas = data["response"]["docs"]
 
-# cargar ofertas ya enviadas
+# cargar ofertas enviadas
 try:
     with open("ofertas_enviadas.json", "r") as f:
         enviadas = json.load(f)
@@ -41,7 +41,6 @@ for o in ofertas:
 
         nuevas.append((id_oferta, texto))
 
-# enviar whatsapp si hay nuevas
 if nuevas:
 
     account_sid = os.environ["TWILIO_SID"]
@@ -56,11 +55,10 @@ if nuevas:
 
     client.messages.create(
         body=mensaje,
-        from_="whatsapp:+14155238886",
-        to=os.environ["NUMERO_DESTINO"]
+        from_=os.environ["TWILIO_FROM"],
+        to=os.environ["TWILIO_TO"]
     )
 
-    # guardar ids
     for n in nuevas:
         enviadas.append(n[0])
 
