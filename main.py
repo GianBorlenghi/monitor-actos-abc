@@ -3,6 +3,11 @@ import json
 import os
 from twilio.rest import Client
 
+import requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select"
 
 params = {
@@ -15,13 +20,13 @@ params = {
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "Accept": "application/json, text/javascript, */*; q=0.01",
-    "Referer": "https://misservicios.abc.gob.ar/actos.publicos.digitales/",
-    "Origin": "https://misservicios.abc.gob.ar"
+    "Accept": "application/json, text/plain, */*",
+    "Connection": "keep-alive"
 }
+r = requests.get(URL, params=params, headers=headers, timeout=30, verify=False)
 
-r = requests.get(URL, params=params, headers=headers, timeout=30)
 data = r.json()
+print(data)
 
 ofertas = data["response"]["docs"]
 
