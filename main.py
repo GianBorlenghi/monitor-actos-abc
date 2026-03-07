@@ -3,7 +3,7 @@ import subprocess
 import os
 from twilio.rest import Client
 
-URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=20&sort=finoferta%20desc&fq=descdistrito:pergamino&wt=json"
+URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=10&sort=finoferta%20desc&fq=descdistrito:pergamino&wt=json"
 
 print("Consultando actos públicos...")
 
@@ -12,26 +12,45 @@ result = subprocess.run(
     stdout=subprocess.PIPE
 )
 
-# decodificar ignorando caracteres raros
-data_text = result.stdout.decode("utf-8", errors="ignore")
-
-data = json.loads(data_text)
+data = json.loads(result.stdout.decode("utf-8", errors="ignore"))
 
 docs = data["response"]["docs"]
-
-if not docs:
-    print("No hay actos")
-    exit()
 
 mensaje = "📢 Actos públicos en Pergamino\n\n"
 
 for d in docs:
 
-    cargo = d.get("desccargo", "Sin cargo")
-    escuela = d.get("desctipoinstitucion", "")
-    fin = d.get("finoferta", "")
+    id_oferta = d.get("idoferta")
 
-    mensaje += f"• {cargo}\n{escuela}\nFin: {fin}\n\n"
+    if not id_oferta:
+        continue
+
+    # endpoint detalle
+    url_detalle = f"https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.detalle/select?q=idoferta:{id_oferta}&wt=json"
+
+    detalle = subprocess.run(
+        ["curl", "-s", url_detalle],
+        stdout=subprocess.PIPE
+    )
+
+    data_det = json.loads(detalle.stdout.decode("utf-8", errors="ignore"))
+
+    detalles = data_det["response"]["docs"]
+
+    for det in detalles:
+
+        materia = det.get("descmateria", "Sin materia")
+        escuela = det.get("descestablecimiento", "Sin escuela")
+        sigla = det.get("sigla", "")
+        horas = det.get("horas", "")
+
+        mensaje += f"""
+📚 {materia}
+🏫 {escuela}
+🔹 {sigla}
+⏱ {horas} horas
+
+"""
 
 print("Enviando WhatsApp...")
 
