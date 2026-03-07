@@ -1,75 +1,47 @@
-import requests
 import json
+import subprocess
 import os
 from twilio.rest import Client
 
-import requests
-import urllib3
+URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=20&sort=finoferta%20desc&fq=descdistrito:pergamino&wt=json"
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+print("Consultando actos públicos...")
 
-URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select"
+# usamos curl porque requests falla con SSL en este servidor
+result = subprocess.run(
+    ["curl", "-s", URL],
+    capture_output=True,
+    text=True
+)
 
-params = {
-    "q": "*:*",
-    "rows": 50,
-    "sort": "finoferta desc",
-    "fq": "descdistrito:pergamino",
-    "wt": "json"
-}
+data = json.loads(result.stdout)
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "Accept": "application/json, text/plain, */*",
-    "Connection": "keep-alive"
-}
-r = requests.get(URL, params=params, headers=headers, timeout=30, verify=False)
+docs = data["response"]["docs"]
 
-data = r.json()
-print(data)
+if not docs:
+    print("No hay resultados")
+    exit()
 
-ofertas = data["response"]["docs"]
+mensaje = "📢 Actos públicos en Pergamino\n\n"
 
-try:
-    with open("ofertas_enviadas.json", "r") as f:
-        enviadas = json.load(f)
-except:
-    enviadas = []
+for d in docs:
+    cargo = d.get("desccargo", "Sin cargo")
+    institucion = d.get("desctipoinstitucion", "")
+    fecha_fin = d.get("finoferta", "")
 
-nuevas = []
+    mensaje += f"• {cargo}\n{institucion}\nFin: {fecha_fin}\n\n"
 
-for o in ofertas:
+print("Enviando WhatsApp...")
 
-    estado = o.get("estadooferta", "")
-    id_oferta = str(o.get("id", ""))
+client = Client(
+    os.environ["TWILIO_SID"],
+    os.environ["TWILIO_TOKEN"]
+)
 
-    if estado == "PUBLICADA" and id_oferta not in enviadas:
+client.messages.create(
+    body=mensaje,
+    from_=os.environ["TWILIO_FROM"],
+    to=os.environ["TWILIO_TO"]
+)
 
-        cargo = o.get("desccargo", "Sin cargo")
-        escuela = o.get("descestablecimiento", "Sin escuela")
-
-        nuevas.append((id_oferta, f"{cargo} - {escuela}"))
-
-if nuevas:
-
-    client = Client(
-        os.environ["TWILIO_SID"],
-        os.environ["TWILIO_TOKEN"]
-    )
-
-    mensaje = "📢 NUEVAS OFERTAS EN PERGAMINO\n\n"
-
-    for n in nuevas:
-        mensaje += f"• {n[1]}\n"
-
-    client.messages.create(
-        body=mensaje,
-        from_=os.environ["TWILIO_FROM"],
-        to=os.environ["TWILIO_TO"]
-    )
-
-    for n in nuevas:
-        enviadas.append(n[0])
-
-    with open("ofertas_enviadas.json", "w") as f:
-        json.dump(enviadas, f)
+print("Mensaje enviado correctamente")
