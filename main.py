@@ -30,15 +30,17 @@ mensaje = "📢 Actos públicos en Pergamino\n\n"
 
 for d in docs:
 
-    materia = d.get("materia", "Sin materia")
-    cargo = d.get("cargo", "")
-    escuela = d.get("establecimiento", "Sin escuela")
+    cargo = d.get("descripcioncargo", "Sin cargo")
+    escuela = d.get("escuela", "Sin escuela")
+    direccion = d.get("domiciliodesempeno", "")
+    curso = d.get("cursodivision", "")
     fin = d.get("finoferta", "")
 
     mensaje += f"""
-📚 {materia}
-💼 {cargo}
-🏫 {escuela}
+📚 {cargo}
+🏫 Escuela: {escuela}
+📍 {direccion}
+👨‍🎓 Curso: {curso}
 ⏰ Cierra: {fin}
 
 """
