@@ -1,9 +1,29 @@
 import json
 import subprocess
 import os
+from datetime import datetime
 from twilio.rest import Client
 
 URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=100&sort=finoferta%20desc&fq=descdistrito:pergamino&fq=estado:publicada&wt=json"
+
+# -----------------------------
+# CONTROL DE HORARIO
+# -----------------------------
+
+ahora = datetime.now()
+
+hora = ahora.hour
+dia_semana = ahora.weekday()  # 0 lunes - 6 domingo
+
+# no correr sábado ni domingo
+if dia_semana >= 5:
+    print("Fin de semana, no se ejecuta")
+    exit()
+
+# horario permitido 10:00 a 23:59
+if hora < 10 or hora >= 24:
+    print("Fuera de horario")
+    exit()
 
 print("Consultando actos públicos...")
 
@@ -26,14 +46,31 @@ if len(docs) == 0:
     print("No hay cargos")
     exit()
 
+# -----------------------------
+# CARGOS YA ENVIADOS
+# -----------------------------
+
+archivo_cache = "enviados.json"
+
+if os.path.exists(archivo_cache):
+    with open(archivo_cache) as f:
+        enviados = json.load(f)
+else:
+    enviados = []
+
 lineas = []
+nuevos_ids = []
 
 for d in docs:
+
+    idoferta = str(d.get("id", ""))
+
+    if idoferta in enviados:
+        continue
 
     cargo = d.get("descripcioncargo", "Sin cargo")
     escuela = d.get("escuela", "Sin escuela")
     curso = d.get("cursodivision", "")
-    fin = d.get("finoferta", "")
 
     linea = f"""
 📚 {cargo}
@@ -42,10 +79,18 @@ for d in docs:
 """
 
     lineas.append(linea)
+    nuevos_ids.append(idoferta)
 
-# armar mensajes de max 1500 caracteres
+if len(lineas) == 0:
+    print("No hay cargos nuevos")
+    exit()
+
+# -----------------------------
+# MENSAJES
+# -----------------------------
+
 mensajes = []
-actual = "📢 Actos públicos en Pergamino\n"
+actual = "📢 Nuevos actos públicos en Pergamino\n"
 
 for l in lineas:
 
@@ -74,3 +119,12 @@ for m in mensajes:
     )
 
 print("Mensajes enviados")
+
+# -----------------------------
+# GUARDAR ENVIADOS
+# -----------------------------
+
+enviados.extend(nuevos_ids)
+
+with open(archivo_cache, "w") as f:
+    json.dump(enviados, f)
