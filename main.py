@@ -12,9 +12,15 @@ result = subprocess.run(
     stdout=subprocess.PIPE
 )
 
-data = json.loads(result.stdout.decode("utf-8", errors="ignore"))
+texto = result.stdout.decode("utf-8", errors="ignore")
 
-docs = data["response"]["docs"]
+if not texto.strip():
+    print("La API no devolvió datos")
+    exit()
+
+data = json.loads(texto)
+
+docs = data.get("response", {}).get("docs", [])
 
 mensaje = "📢 Actos públicos en Pergamino\n\n"
 
@@ -25,7 +31,6 @@ for d in docs:
     if not id_oferta:
         continue
 
-    # endpoint detalle
     url_detalle = f"https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.detalle/select?q=idoferta:{id_oferta}&wt=json"
 
     detalle = subprocess.run(
@@ -33,9 +38,17 @@ for d in docs:
         stdout=subprocess.PIPE
     )
 
-    data_det = json.loads(detalle.stdout.decode("utf-8", errors="ignore"))
+    texto_det = detalle.stdout.decode("utf-8", errors="ignore")
 
-    detalles = data_det["response"]["docs"]
+    if not texto_det.strip():
+        continue
+
+    try:
+        data_det = json.loads(texto_det)
+    except:
+        continue
+
+    detalles = data_det.get("response", {}).get("docs", [])
 
     for det in detalles:
 
@@ -51,6 +64,10 @@ for d in docs:
 ⏱ {horas} horas
 
 """
+
+if mensaje.strip() == "📢 Actos públicos en Pergamino":
+    print("No hay cargos")
+    exit()
 
 print("Enviando WhatsApp...")
 
