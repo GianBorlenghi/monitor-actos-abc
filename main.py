@@ -7,29 +7,31 @@ URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezad
 
 print("Consultando actos públicos...")
 
-# usamos curl porque requests falla con SSL en este servidor
 result = subprocess.run(
     ["curl", "-s", URL],
-    capture_output=True,
-    text=True
+    stdout=subprocess.PIPE
 )
 
-data = json.loads(result.stdout)
+# decodificar ignorando caracteres raros
+data_text = result.stdout.decode("utf-8", errors="ignore")
+
+data = json.loads(data_text)
 
 docs = data["response"]["docs"]
 
 if not docs:
-    print("No hay resultados")
+    print("No hay actos")
     exit()
 
 mensaje = "📢 Actos públicos en Pergamino\n\n"
 
 for d in docs:
-    cargo = d.get("desccargo", "Sin cargo")
-    institucion = d.get("desctipoinstitucion", "")
-    fecha_fin = d.get("finoferta", "")
 
-    mensaje += f"• {cargo}\n{institucion}\nFin: {fecha_fin}\n\n"
+    cargo = d.get("desccargo", "Sin cargo")
+    escuela = d.get("desctipoinstitucion", "")
+    fin = d.get("finoferta", "")
+
+    mensaje += f"• {cargo}\n{escuela}\nFin: {fin}\n\n"
 
 print("Enviando WhatsApp...")
 
@@ -44,4 +46,4 @@ client.messages.create(
     to=os.environ["TWILIO_TO"]
 )
 
-print("Mensaje enviado correctamente")
+print("Mensaje enviado")
