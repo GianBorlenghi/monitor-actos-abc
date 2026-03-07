@@ -2,29 +2,39 @@ name: Monitor Actos ABC
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: '0 */2 * * *'
   workflow_dispatch:
 
 jobs:
-  run:
+  run-bot:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Descargar repo
+
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Instalar Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Instalar dependencias
-        run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install twilio
 
-      - name: Ejecutar bot
+      - name: Run bot
         run: python main.py
         env:
           TWILIO_SID: ${{ secrets.TWILIO_SID }}
           TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
           TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
           TWILIO_TO: ${{ secrets.TWILIO_TO }}
+
+      - name: Commit cache
+        run: |
+          git config --global user.name "bot"
+          git config --global user.email "bot@github.com"
+          git add enviados.json || true
+          git commit -m "update cache" || true
+          git push
