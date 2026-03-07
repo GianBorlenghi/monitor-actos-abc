@@ -3,7 +3,7 @@ import subprocess
 import os
 from twilio.rest import Client
 
-URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=20&sort=finoferta%20desc&fq=descdistrito:pergamino&wt=json"
+URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=100&sort=finoferta%20desc&fq=descdistrito:pergamino&wt=json"
 
 print("Consultando actos públicos...")
 
@@ -26,33 +26,51 @@ if len(docs) == 0:
     print("No hay cargos")
     exit()
 
-mensaje = "📢 Actos públicos en Pergamino\n\n"
+lineas = []
 
 for d in docs:
 
     cargo = d.get("descripcioncargo", "Sin cargo")
     escuela = d.get("escuela", "Sin escuela")
-    direccion = d.get("domiciliodesempeno", "")
     curso = d.get("cursodivision", "")
     fin = d.get("finoferta", "")
 
-    mensaje += f"""
+    linea = f"""
 📚 {cargo}
-🏫 Escuela: {escuela}
-
+🏫 {escuela}
+👨‍🎓 {curso}
 """
 
-print("Enviando WhatsApp...")
+    lineas.append(linea)
+
+# armar mensajes de max 1500 caracteres
+mensajes = []
+actual = "📢 Actos públicos en Pergamino\n"
+
+for l in lineas:
+
+    if len(actual) + len(l) > 1500:
+        mensajes.append(actual)
+        actual = ""
+
+    actual += l
+
+if actual:
+    mensajes.append(actual)
+
+print(f"Se enviarán {len(mensajes)} mensajes")
 
 client = Client(
     os.environ["TWILIO_SID"],
     os.environ["TWILIO_TOKEN"]
 )
 
-client.messages.create(
-    body=mensaje,
-    from_=os.environ["TWILIO_FROM"],
-    to=os.environ["TWILIO_TO"]
-)
+for m in mensajes:
 
-print("Mensaje enviado")
+    client.messages.create(
+        body=m,
+        from_=os.environ["TWILIO_FROM"],
+        to=os.environ["TWILIO_TO"]
+    )
+
+print("Mensajes enviados")
