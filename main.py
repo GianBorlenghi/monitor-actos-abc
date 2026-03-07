@@ -39,9 +39,6 @@ for d in docs:
     mensaje += f"""
 📚 {cargo}
 🏫 Escuela: {escuela}
-📍 {direccion}
-👨‍🎓 Curso: {curso}
-⏰ Cierra: {fin}
 
 """
 
