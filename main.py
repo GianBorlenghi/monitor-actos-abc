@@ -4,6 +4,30 @@ import os
 from datetime import datetime
 from twilio.rest import Client
 
+def obtener_puntaje_max(idoferta, iddetalle):
+
+    url = f"https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select?fq=idoferta:{idoferta}&fq=iddetalle:{iddetalle}&q=idoferta:{idoferta}%20OR%20iddetalle:{iddetalle}&rows=10&sort=estadopostulacion%20asc%2C%20orden%20asc%2C%20puntaje%20desc&wt=json"
+
+    try:
+        result = subprocess.run(
+            ["curl", "-s", url],
+            stdout=subprocess.PIPE
+        )
+
+        texto = result.stdout.decode("utf-8", errors="ignore")
+        data = json.loads(texto)
+
+        docs = data.get("response", {}).get("docs", [])
+
+        if len(docs) > 0:
+            return docs[0].get("puntaje", 0)
+
+    except:
+        pass
+
+    return "sin datos"
+
+
 URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=100&sort=finoferta%20desc&fq=descdistrito:pergamino&fq=estado:publicada&wt=json"
 
 # -----------------------------
@@ -16,9 +40,9 @@ hora = ahora.hour
 dia_semana = ahora.weekday()  # 0 lunes - 6 domingo
 
 # no correr sábado ni domingo
-if dia_semana >= 5:
+'''if dia_semana >= 5:
     print("Fin de semana, no se ejecuta")
-    exit()
+    exit()'''
 
 # horario permitido 10:00 a 23:59
 '''if hora < 10 or hora >= 24:
@@ -74,11 +98,18 @@ for d in docs:
     cargo = d.get("descripcioncargo", "Sin cargo")
     escuela = d.get("escuela", "Sin escuela")
     curso = d.get("cursodivision", "")
+    iddetalle = d.get("iddetalle", "")
 
+    puntaje_max = obtener_puntaje_max(idoferta, iddetalle)
+
+    link = f"https://misservicios.abc.gob.ar/actos.publicos.digitales/oferta/{idoferta}"
     linea = f"""
 📚 {cargo}
 🏫 {escuela}
 👨‍🎓 {curso}
+🏆 {puntaje_max}
+
+🔗 {link}
 """
 
     lineas.append(linea)
@@ -131,3 +162,4 @@ enviados.extend(nuevos_ids)
 
 with open(archivo_cache, "w") as f:
     json.dump(enviados, f, indent=2)
+
