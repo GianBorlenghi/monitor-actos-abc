@@ -130,5 +130,4 @@ print("Mensajes enviados")
 enviados.extend(nuevos_ids)
 
 with open(archivo_cache, "w") as f:
-    json.dump(enviados, f)
-
+json.dump(enviados, f, indent=2)
