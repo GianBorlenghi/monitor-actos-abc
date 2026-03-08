@@ -5,25 +5,32 @@ from datetime import datetime
 from twilio.rest import Client
 
 def obtener_puntaje_max(idoferta, iddetalle):
-
-    url = f"https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select?fq=idoferta:{idoferta}&fq=iddetalle:{iddetalle}&q=idoferta:{idoferta}%20OR%20iddetalle:{iddetalle}&rows=10&sort=estadopostulacion%20asc%2C%20orden%20asc%2C%20puntaje%20desc&wt=json"
+    import re
+    url = (
+        f"https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select"
+        f"?fq=idoferta:{idoferta}&fq=iddetalle:{iddetalle}"
+        f"&q=idoferta:{idoferta}%20OR%20iddetalle:{iddetalle}"
+        f"&rows=10&sort=estadopostulacion%20asc,orden%20asc,puntaje%20desc"
+        f"&wt=json&json.nl=map"
+    )
 
     try:
-        result = subprocess.run(
-            ["curl", "-s", url],
-            stdout=subprocess.PIPE
-        )
+        result = subprocess.run(["curl", "-s", url], stdout=subprocess.PIPE)
+        texto = result.stdout.decode("utf-8", errors="ignore").strip()
 
-        texto = result.stdout.decode("utf-8", errors="ignore")
-        data = json.loads(texto)
+        # Quitar JSONP si existe
+        match = re.search(r"\{.*\}", texto, re.DOTALL)
+        if not match:
+            return "sin datos"
+        json_text = match.group(0)
 
+        data = json.loads(json_text)
         docs = data.get("response", {}).get("docs", [])
-
-        if len(docs) > 0:
+        if docs:
             return docs[0].get("puntaje", 0)
-
-    except:
-        pass
+    except Exception as e:
+        print("Error al obtener puntaje:", e)
+        return "sin datos"
 
     return "sin datos"
 
