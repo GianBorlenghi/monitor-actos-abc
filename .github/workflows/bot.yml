@@ -1,8 +1,10 @@
 name: Monitor Actos ABC
 
 on:
-  #schedule:
-   # - cron: '0 */2 * * *'
+  schedule:
+    - cron: '0 14 * * 1-5'
+    - cron: '0 21 * * 1-5'
+    - cron: '0 1 * * 2-6'
   workflow_dispatch:
 
 jobs:
@@ -38,4 +40,13 @@ jobs:
           git pull
           git add enviados.json || true
           git commit -m "update cache" || true
+          git push
+
+      # BORRAR CACHE DESPUÉS DEL RUN DE LAS 22 ARG
+      - name: Reset cache at night
+        if: github.event.schedule == '0 1 * * 2-6'
+        run: |
+          echo "[]" > enviados.json
+          git add enviados.json
+          git commit -m "reset cache" || true
           git push
