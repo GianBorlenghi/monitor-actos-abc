@@ -53,8 +53,11 @@ if len(docs) == 0:
 archivo_cache = "enviados.json"
 
 if os.path.exists(archivo_cache):
-    with open(archivo_cache) as f:
-        enviados = json.load(f)
+    try:
+        with open(archivo_cache) as f:
+            enviados = json.load(f)
+    except:
+        enviados = []
 else:
     enviados = []
 
