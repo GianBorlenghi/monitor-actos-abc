@@ -10,7 +10,7 @@ URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezad
 # CONTROL DE HORARIO
 # -----------------------------
 
-ahora = datetime.now()
+'''ahora = datetime.now()
 
 hora = ahora.hour
 dia_semana = ahora.weekday()  # 0 lunes - 6 domingo
@@ -23,7 +23,7 @@ if dia_semana >= 5:
 # horario permitido 10:00 a 23:59
 if hora < 10 or hora >= 24:
     print("Fuera de horario")
-    exit()
+    exit()'''
 
 print("Consultando actos públicos...")
 
