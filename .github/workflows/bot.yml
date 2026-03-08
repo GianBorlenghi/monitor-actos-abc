@@ -1,11 +1,11 @@
 name: Monitor Actos ABC
 
-on:
-  schedule:
-    - cron: '0 14 * * 1-5'
-    - cron: '0 21 * * 1-5'
-    - cron: '0 1 * * 2-6'
-  workflow_dispatch:
+#on:
+ # schedule:
+  #  - cron: '0 14 * * 1-5'
+  #  - cron: '0 21 * * 1-5'
+   # - cron: '0 1 * * 2-6'
+ # workflow_dispatch:
 
 jobs:
   run-bot:
