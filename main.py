@@ -2,75 +2,42 @@ import json
 import subprocess
 import os
 import requests
+import re
 from datetime import datetime
 from twilio.rest import Client
 
-# --------------------------------------
-# Parámetros de ejemplo (los de tu URL)
-# --------------------------------------
-idoferta = 3852593
-iddetalle = 3837133
 
-url = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select"
-params = {
-    "fq": [f"idoferta:{idoferta}", f"iddetalle:{iddetalle}"],
-    "q": f"idoferta:{idoferta} OR iddetalle:{iddetalle}",
-    "rows": "10",
-    "sort": "estadopostulacion asc, orden asc, puntaje desc",
-    "wt": "json",
-    "json.nl": "map"
-}
-
-# --------------------------------------
-# Hacer la request
-# --------------------------------------
-response = requests.get(url, params=params)
-
-print("URL final que se está usando:")
-print(response.url)
-print("\nStatus code:", response.status_code)
-
-texto = response.text
-print("\nTexto crudo de la API:")
-print(texto[:1000], "...")  # imprimir solo los primeros 1000 caracteres para no saturar
-
-# --------------------------------------
-# Intentar parsear JSON
-# --------------------------------------
-try:
-    data = response.json()
-    docs = data.get("response", {}).get("docs", [])
-    print("\nNúmero de docs encontrados:", len(docs))
-    if docs:
-        print("\nPrimer doc completo:")
-        print(json.dumps(docs[0], indent=2))
-        print("\nPuntaje:", docs[0].get("puntaje", "no encontrado"))
-    else:
-        print("\nNo hay docs en la respuesta")
-except Exception as e:
-    print("\nError al parsear JSON:", e)
-'''def obtener_puntaje_max(idoferta, iddetalle):
-    url = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select"
-    params = {
-        "fq": [f"idoferta:{idoferta}", f"iddetalle:{iddetalle}"],
-        "q": f"idoferta:{idoferta} OR iddetalle:{iddetalle}",
-        "rows": "10",
-        "sort": "estadopostulacion asc, orden asc, puntaje desc",
-        "wt": "json",
-        "json.nl": "map"
-    }
-
+def obtener_puntaje_max(idoferta, iddetalle):
+    url = (
+        f"https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select"
+        f"?fq=idoferta:{idoferta}&fq=iddetalle:{iddetalle}"
+        f"&q=idoferta:{idoferta}%20OR%20iddetalle:{iddetalle}"
+        f"&rows=10&sort=estadopostulacion%20asc,orden%20asc,puntaje%20desc"
+        f"&wt=json&json.nl=map"
+    )
     try:
-        r = requests.get(url, params=params)
-        r.raise_for_status()
-        data = r.json()  # ahora es JSON limpio
+        # forzar TLS moderno con curl
+        result = subprocess.run(
+            ["curl", "--tlsv1.2", "-s", url],
+            stdout=subprocess.PIPE
+        )
+        texto = result.stdout.decode("utf-8", errors="ignore").strip()
+
+        # Extraer solo JSON (por si es JSONP)
+        match = re.search(r"\{.*\}", texto, re.DOTALL)
+        if not match:
+            return "sin datos"
+        json_text = match.group(0)
+
+        data = json.loads(json_text)
         docs = data.get("response", {}).get("docs", [])
         if docs:
             return docs[0].get("puntaje", 0)
-        return "sin datos"
     except Exception as e:
         print("Error al obtener puntaje:", e)
-        return "sin datos"'''
+        return "sin datos"
+
+    return "sin datos"
 
 URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=100&sort=finoferta%20desc&fq=descdistrito:pergamino&fq=estado:publicada&wt=json"
 
