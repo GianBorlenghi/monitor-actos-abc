@@ -78,16 +78,10 @@ for d in docs:
     curso = d.get("cursodivision", "")
     iddetalle = d.get("iddetalle", "")
 
-# timestamp en milisegundos
-    timestamp = int(time.time() * 1000)
-
-# Link correcto
-    link = f"https://misservicios.abc.gob.ar/actos.publicos.digitales/postulantes/?oferta={idoferta}&detalle={iddetalle}&_t={timestamp}"
     linea = f"""
 📚 {cargo}
 🏫 {escuela}
 👨‍🎓 {curso}
-🔗 {link}
 """
 
     lineas.append(linea)
