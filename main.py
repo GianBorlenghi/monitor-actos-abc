@@ -5,7 +5,51 @@ import requests
 from datetime import datetime
 from twilio.rest import Client
 
-def obtener_puntaje_max(idoferta, iddetalle):
+# --------------------------------------
+# Parámetros de ejemplo (los de tu URL)
+# --------------------------------------
+idoferta = 3852593
+iddetalle = 3837133
+
+url = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select"
+params = {
+    "fq": [f"idoferta:{idoferta}", f"iddetalle:{iddetalle}"],
+    "q": f"idoferta:{idoferta} OR iddetalle:{iddetalle}",
+    "rows": "10",
+    "sort": "estadopostulacion asc, orden asc, puntaje desc",
+    "wt": "json",
+    "json.nl": "map"
+}
+
+# --------------------------------------
+# Hacer la request
+# --------------------------------------
+response = requests.get(url, params=params)
+
+print("URL final que se está usando:")
+print(response.url)
+print("\nStatus code:", response.status_code)
+
+texto = response.text
+print("\nTexto crudo de la API:")
+print(texto[:1000], "...")  # imprimir solo los primeros 1000 caracteres para no saturar
+
+# --------------------------------------
+# Intentar parsear JSON
+# --------------------------------------
+try:
+    data = response.json()
+    docs = data.get("response", {}).get("docs", [])
+    print("\nNúmero de docs encontrados:", len(docs))
+    if docs:
+        print("\nPrimer doc completo:")
+        print(json.dumps(docs[0], indent=2))
+        print("\nPuntaje:", docs[0].get("puntaje", "no encontrado"))
+    else:
+        print("\nNo hay docs en la respuesta")
+except Exception as e:
+    print("\nError al parsear JSON:", e)
+'''def obtener_puntaje_max(idoferta, iddetalle):
     url = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select"
     params = {
         "fq": [f"idoferta:{idoferta}", f"iddetalle:{iddetalle}"],
@@ -26,7 +70,7 @@ def obtener_puntaje_max(idoferta, iddetalle):
         return "sin datos"
     except Exception as e:
         print("Error al obtener puntaje:", e)
-        return "sin datos"
+        return "sin datos"'''
 
 URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=100&sort=finoferta%20desc&fq=descdistrito:pergamino&fq=estado:publicada&wt=json"
 
