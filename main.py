@@ -6,39 +6,6 @@ import re
 from datetime import datetime
 from twilio.rest import Client
 
-
-def obtener_puntaje_max(idoferta, iddetalle):
-    url = (
-        f"https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.postulante/select"
-        f"?fq=idoferta:{idoferta}&fq=iddetalle:{iddetalle}"
-        f"&q=idoferta:{idoferta}%20OR%20iddetalle:{iddetalle}"
-        f"&rows=10&sort=estadopostulacion%20asc,orden%20asc,puntaje%20desc"
-        f"&wt=json&json.nl=map"
-    )
-    try:
-        # forzar TLS moderno con curl
-        result = subprocess.run(
-            ["curl", "--tlsv1.2", "-s", url],
-            stdout=subprocess.PIPE
-        )
-        texto = result.stdout.decode("utf-8", errors="ignore").strip()
-
-        # Extraer solo JSON (por si es JSONP)
-        match = re.search(r"\{.*\}", texto, re.DOTALL)
-        if not match:
-            return "sin datos"
-        json_text = match.group(0)
-
-        data = json.loads(json_text)
-        docs = data.get("response", {}).get("docs", [])
-        if docs:
-            return docs[0].get("puntaje", 0)
-    except Exception as e:
-        print("Error al obtener puntaje:", e)
-        return "sin datos"
-
-    return "sin datos"
-
 URL = "https://servicios3.abc.gob.ar/valoracion.docente/api/apd.oferta.encabezado/select?q=*:*&rows=100&sort=finoferta%20desc&fq=descdistrito:pergamino&fq=estado:publicada&wt=json"
 
 # -----------------------------
@@ -111,15 +78,15 @@ for d in docs:
     curso = d.get("cursodivision", "")
     iddetalle = d.get("iddetalle", "")
 
-    puntaje_max = obtener_puntaje_max(idoferta, iddetalle)
+# timestamp en milisegundos
+    timestamp = int(time.time() * 1000)
 
-    link = f"https://misservicios.abc.gob.ar/actos.publicos.digitales/oferta/{idoferta}"
+# Link correcto
+    link = f"https://misservicios.abc.gob.ar/actos.publicos.digitales/postulantes/?oferta={idoferta}&detalle={iddetalle}&_t={timestamp}"
     linea = f"""
 📚 {cargo}
 🏫 {escuela}
 👨‍🎓 {curso}
-🏆 {puntaje_max}
-
 🔗 {link}
 """
 
