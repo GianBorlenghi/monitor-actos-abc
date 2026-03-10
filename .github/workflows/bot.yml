@@ -44,7 +44,7 @@ jobs:
 
       # BORRAR CACHE DESPUÉS DEL RUN DE LAS 22 ARG
       - name: Reset cache at night
-        if: github.event.schedule == '0 1 * * 2-6'
+        if: github.event.schedule == '5 1 * * 2-6'
         run: |
           echo "[]" > enviados.json
           git add enviados.json
