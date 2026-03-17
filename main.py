@@ -78,12 +78,7 @@ for d in docs:
     curso = d.get("cursodivision", "")
     iddetalle = d.get("iddetalle", "")
 
-    linea = f"""
-📚 {cargo}
-🏫 {escuela}
-👨‍🎓 {curso}
-"""
-
+ linea = f"📚 {cargo}\n🏫 {escuela}\n👨‍🎓 {curso}\n"
     lineas.append(linea)
     nuevos_ids.append(idoferta)
 
@@ -95,20 +90,33 @@ if len(lineas) == 0:
 # MENSAJES
 # -----------------------------
 
-mensajes = []
-actual = "📢 Nuevos actos públicos en Pergamino\n"
+MAX_LEN = 1500
 
-for l in lineas:
+def dividir_mensajes(lineas):
+    mensajes = []
+    actual = "📢 Nuevos actos públicos en Pergamino\n\n"
 
-    if len(actual) + len(l) > 1500:
-        mensajes.append(actual)
-        actual = ""
+    for l in lineas:
+        # si agregar rompe el límite → corto
+        if len(actual) + len(l) + 1 > MAX_LEN:
+            mensajes.append(actual.strip())
+            actual = "📢 Nuevos actos públicos en Pergamino\n\n"
 
-    actual += l
+        actual += l + "\n"
 
-if actual:
-    mensajes.append(actual)
+    if actual.strip():
+        mensajes.append(actual.strip())
 
+    return mensajes
+
+
+mensajes = dividir_mensajes(lineas)
+
+print(f"Se enviarán {len(mensajes)} mensajes")
+
+# DEBUG (opcional pero recomendado)
+for i, m in enumerate(mensajes):
+    print(f"Mensaje {i+1}: {len(m)} caracteres")
 print(f"Se enviarán {len(mensajes)} mensajes")
 
 client = Client(
