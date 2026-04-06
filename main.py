@@ -78,7 +78,7 @@ for d in docs:
     curso = d.get("cursodivision", "")
     iddetalle = d.get("iddetalle", "")
 
- linea = f"📚 {cargo}\n🏫 {escuela}\n👨‍🎓 {curso}\n"
+    linea = f"📚 {cargo}\n🏫 {escuela}\n👨‍🎓 {curso}\n"
     lineas.append(linea)
     nuevos_ids.append(idoferta)
 
